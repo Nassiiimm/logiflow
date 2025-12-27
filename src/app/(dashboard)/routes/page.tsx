@@ -61,6 +61,7 @@ import {
 import { formatDate } from "@/lib/utils";
 import { toast } from "sonner";
 import Link from "next/link";
+import { Pagination } from "@/components/ui/pagination";
 
 interface Route {
   id: string;
@@ -126,6 +127,10 @@ export default function RoutesPage() {
     id: "",
     routeNumber: "",
   });
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
+  const [totalCount, setTotalCount] = useState(0);
+  const [totalPages, setTotalPages] = useState(0);
 
   // Form state for new route
   const [formData, setFormData] = useState({
@@ -150,22 +155,34 @@ export default function RoutesPage() {
 
   useEffect(() => {
     fetchRoutes();
+  }, [searchTerm, statusFilter, dateFilter, currentPage, pageSize]);
+
+  useEffect(() => {
     fetchContracts();
     fetchDrivers();
     fetchVehicles();
+  }, []);
+
+  useEffect(() => {
+    setCurrentPage(1);
   }, [searchTerm, statusFilter, dateFilter]);
 
   async function fetchRoutes() {
     try {
+      setLoading(true);
       const params = new URLSearchParams();
       if (searchTerm) params.set("search", searchTerm);
       if (statusFilter !== "all") params.set("status", statusFilter);
       if (dateFilter) params.set("date", dateFilter);
+      params.set("page", currentPage.toString());
+      params.set("pageSize", pageSize.toString());
 
       const res = await fetch(`/api/routes?${params}`);
       if (res.ok) {
         const data = await res.json();
-        setRoutes(data);
+        setRoutes(data.data);
+        setTotalCount(data.pagination.totalCount);
+        setTotalPages(data.pagination.totalPages);
       }
     } catch (error) {
       console.error("Failed to fetch routes:", error);
@@ -835,6 +852,19 @@ export default function RoutesPage() {
                 )}
               </TableBody>
             </Table>
+          )}
+          {!loading && totalCount > 0 && (
+            <Pagination
+              currentPage={currentPage}
+              totalPages={totalPages}
+              totalItems={totalCount}
+              pageSize={pageSize}
+              onPageChange={setCurrentPage}
+              onPageSizeChange={(size) => {
+                setPageSize(size);
+                setCurrentPage(1);
+              }}
+            />
           )}
         </div>
       </div>

@@ -6,6 +6,8 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const status = searchParams.get("status");
     const search = searchParams.get("search");
+    const page = parseInt(searchParams.get("page") || "1");
+    const pageSize = parseInt(searchParams.get("pageSize") || "20");
 
     const where: Record<string, unknown> = {};
 
@@ -20,17 +22,22 @@ export async function GET(request: NextRequest) {
       ];
     }
 
-    const invoices = await prisma.invoice.findMany({
-      where,
-      orderBy: { createdAt: "desc" },
-      include: {
-        customer: { select: { name: true, company: true } },
-        items: true,
-      },
-    });
+    const [invoices, totalCount] = await Promise.all([
+      prisma.invoice.findMany({
+        where,
+        orderBy: { createdAt: "desc" },
+        include: {
+          customer: { select: { name: true, company: true } },
+          items: true,
+        },
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+      }),
+      prisma.invoice.count({ where }),
+    ]);
 
-    return NextResponse.json(
-      invoices.map((i) => ({
+    return NextResponse.json({
+      data: invoices.map((i) => ({
         id: i.id,
         invoiceNumber: i.invoiceNumber,
         customer: i.customer.name,
@@ -43,8 +50,14 @@ export async function GET(request: NextRequest) {
         total: i.total,
         status: i.status,
         ordersCount: i.items.length,
-      }))
-    );
+      })),
+      pagination: {
+        page,
+        pageSize,
+        totalCount,
+        totalPages: Math.ceil(totalCount / pageSize),
+      },
+    });
   } catch (error) {
     console.error("Invoices GET error:", error);
     return NextResponse.json(

@@ -9,51 +9,68 @@ export async function GET(request: NextRequest) {
     const contractId = searchParams.get("contractId");
     const driverId = searchParams.get("driverId");
     const date = searchParams.get("date");
+    const page = parseInt(searchParams.get("page") || "1");
+    const pageSize = parseInt(searchParams.get("pageSize") || "20");
 
-    const routes = await prisma.route.findMany({
-      where: {
-        AND: [
-          search
-            ? {
-                OR: [
-                  { routeNumber: { contains: search, mode: "insensitive" } },
-                  { name: { contains: search, mode: "insensitive" } },
-                ],
-              }
-            : {},
-          status ? { status: status as any } : {},
-          contractId ? { contractId } : {},
-          driverId ? { driverId } : {},
-          date
-            ? {
-                scheduledDate: {
-                  gte: new Date(date),
-                  lt: new Date(new Date(date).getTime() + 24 * 60 * 60 * 1000),
-                },
-              }
-            : {},
-        ],
-      },
-      include: {
-        contract: {
-          select: { name: true, code: true },
-        },
-        driver: {
-          include: {
-            user: { select: { name: true } },
+    const where = {
+      AND: [
+        search
+          ? {
+              OR: [
+                { routeNumber: { contains: search, mode: "insensitive" as const } },
+                { name: { contains: search, mode: "insensitive" as const } },
+              ],
+            }
+          : {},
+        status ? { status: status as any } : {},
+        contractId ? { contractId } : {},
+        driverId ? { driverId } : {},
+        date
+          ? {
+              scheduledDate: {
+                gte: new Date(date),
+                lt: new Date(new Date(date).getTime() + 24 * 60 * 60 * 1000),
+              },
+            }
+          : {},
+      ],
+    };
+
+    const [routes, totalCount] = await Promise.all([
+      prisma.route.findMany({
+        where,
+        include: {
+          contract: {
+            select: { name: true, code: true },
+          },
+          driver: {
+            include: {
+              user: { select: { name: true } },
+            },
+          },
+          vehicle: {
+            select: { plateNumber: true, type: true },
+          },
+          _count: {
+            select: { stops: true },
           },
         },
-        vehicle: {
-          select: { plateNumber: true, type: true },
-        },
-        _count: {
-          select: { stops: true },
-        },
-      },
-      orderBy: { scheduledDate: "desc" },
-    });
+        orderBy: { scheduledDate: "desc" },
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+      }),
+      prisma.route.count({ where }),
+    ]);
 
-    return NextResponse.json(routes);
+    return NextResponse.json({
+      data: routes,
+      pagination: {
+        page,
+        pageSize,
+        totalCount,
+        totalPages: Math.ceil(totalCount / pageSize),
+      },
+    });
   } catch (error) {
     console.error("Routes GET error:", error);
     return NextResponse.json(

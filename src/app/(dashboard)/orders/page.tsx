@@ -43,6 +43,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Plus, Search, Eye, Edit, Trash2, Loader2 } from "lucide-react";
 import { getStatusColor, getStatusLabel, formatDate, formatCurrency } from "@/lib/utils";
 import { toast } from "sonner";
+import { Pagination } from "@/components/ui/pagination";
 
 interface Order {
   id: string;
@@ -76,6 +77,10 @@ export default function OrdersPage() {
     id: "",
     trackingNumber: "",
   });
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
+  const [totalCount, setTotalCount] = useState(0);
+  const [totalPages, setTotalPages] = useState(0);
 
   // Form state
   const [formData, setFormData] = useState({
@@ -94,19 +99,31 @@ export default function OrdersPage() {
 
   useEffect(() => {
     fetchOrders();
+  }, [statusFilter, searchTerm, currentPage, pageSize]);
+
+  useEffect(() => {
     fetchCustomers();
+  }, []);
+
+  useEffect(() => {
+    setCurrentPage(1);
   }, [statusFilter, searchTerm]);
 
   async function fetchOrders() {
     try {
+      setLoading(true);
       const params = new URLSearchParams();
       if (statusFilter !== "all") params.set("status", statusFilter);
       if (searchTerm) params.set("search", searchTerm);
+      params.set("page", currentPage.toString());
+      params.set("pageSize", pageSize.toString());
 
       const res = await fetch(`/api/orders?${params}`);
       if (res.ok) {
         const data = await res.json();
-        setOrders(data);
+        setOrders(data.data);
+        setTotalCount(data.pagination.totalCount);
+        setTotalPages(data.pagination.totalPages);
       }
     } catch (error) {
       console.error("Failed to fetch orders:", error);
@@ -117,10 +134,10 @@ export default function OrdersPage() {
 
   async function fetchCustomers() {
     try {
-      const res = await fetch("/api/customers");
+      const res = await fetch("/api/customers?pageSize=1000");
       if (res.ok) {
         const data = await res.json();
-        setCustomers(data);
+        setCustomers(data.data || data);
       }
     } catch (error) {
       console.error("Failed to fetch customers:", error);
@@ -440,6 +457,19 @@ export default function OrdersPage() {
                 )}
               </TableBody>
             </Table>
+          )}
+          {!loading && totalCount > 0 && (
+            <Pagination
+              currentPage={currentPage}
+              totalPages={totalPages}
+              totalItems={totalCount}
+              pageSize={pageSize}
+              onPageChange={setCurrentPage}
+              onPageSizeChange={(size) => {
+                setPageSize(size);
+                setCurrentPage(1);
+              }}
+            />
           )}
         </div>
       </div>

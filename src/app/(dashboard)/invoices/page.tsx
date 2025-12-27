@@ -34,6 +34,7 @@ import { Plus, Search, Eye, Download, Send, FileText, Euro, Loader2 } from "luci
 import { getStatusColor, getStatusLabel, formatDate, formatCurrency } from "@/lib/utils";
 import { toast } from "sonner";
 import { InvoicePDF, type InvoiceData } from "@/components/pdf/invoice-pdf";
+import { Pagination } from "@/components/ui/pagination";
 
 interface Invoice {
   id: string;
@@ -73,6 +74,10 @@ export default function InvoicesPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedOrders, setSelectedOrders] = useState<string[]>([]);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
+  const [totalCount, setTotalCount] = useState(0);
+  const [totalPages, setTotalPages] = useState(0);
 
   const [formData, setFormData] = useState({
     customerId: "",
@@ -115,32 +120,49 @@ export default function InvoicesPage() {
   }
 
   useEffect(() => {
-    fetchData();
+    fetchInvoices();
+  }, [statusFilter, searchTerm, currentPage, pageSize]);
+
+  useEffect(() => {
+    fetchCustomers();
+  }, []);
+
+  useEffect(() => {
+    setCurrentPage(1);
   }, [statusFilter, searchTerm]);
 
-  async function fetchData() {
+  async function fetchInvoices() {
     try {
+      setLoading(true);
       const params = new URLSearchParams();
       if (statusFilter !== "all") params.set("status", statusFilter);
       if (searchTerm) params.set("search", searchTerm);
+      params.set("page", currentPage.toString());
+      params.set("pageSize", pageSize.toString());
 
-      const [invoicesRes, customersRes] = await Promise.all([
-        fetch(`/api/invoices?${params}`),
-        fetch("/api/customers"),
-      ]);
-
-      if (invoicesRes.ok) {
-        const invoicesData = await invoicesRes.json();
-        setInvoices(invoicesData);
-      }
-      if (customersRes.ok) {
-        const customersData = await customersRes.json();
-        setCustomers(customersData);
+      const res = await fetch(`/api/invoices?${params}`);
+      if (res.ok) {
+        const data = await res.json();
+        setInvoices(data.data);
+        setTotalCount(data.pagination.totalCount);
+        setTotalPages(data.pagination.totalPages);
       }
     } catch (error) {
-      console.error("Failed to fetch data:", error);
+      console.error("Failed to fetch invoices:", error);
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function fetchCustomers() {
+    try {
+      const res = await fetch("/api/customers?pageSize=1000");
+      if (res.ok) {
+        const data = await res.json();
+        setCustomers(data.data || data);
+      }
+    } catch (error) {
+      console.error("Failed to fetch customers:", error);
     }
   }
 
@@ -199,7 +221,7 @@ export default function InvoicesPage() {
         });
         setSelectedOrders([]);
         setCustomerOrders([]);
-        fetchData();
+        fetchInvoices();
       } else {
         const data = await res.json();
         toast.error(data.error || "Erreur lors de la creation");
@@ -501,6 +523,19 @@ export default function InvoicesPage() {
                 )}
               </TableBody>
             </Table>
+          )}
+          {!loading && totalCount > 0 && (
+            <Pagination
+              currentPage={currentPage}
+              totalPages={totalPages}
+              totalItems={totalCount}
+              pageSize={pageSize}
+              onPageChange={setCurrentPage}
+              onPageSizeChange={(size) => {
+                setPageSize(size);
+                setCurrentPage(1);
+              }}
+            />
           )}
         </div>
       </div>

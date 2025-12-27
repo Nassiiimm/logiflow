@@ -5,6 +5,8 @@ export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const search = searchParams.get("search");
+    const page = parseInt(searchParams.get("page") || "1");
+    const pageSize = parseInt(searchParams.get("pageSize") || "20");
 
     const where: Record<string, unknown> = {};
 
@@ -16,22 +18,33 @@ export async function GET(request: NextRequest) {
       ];
     }
 
-    const customers = await prisma.customer.findMany({
-      where,
-      orderBy: { createdAt: "desc" },
-      include: {
-        _count: {
-          select: { orders: true },
+    const [customers, totalCount] = await Promise.all([
+      prisma.customer.findMany({
+        where,
+        orderBy: { createdAt: "desc" },
+        include: {
+          _count: {
+            select: { orders: true },
+          },
         },
-      },
-    });
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+      }),
+      prisma.customer.count({ where }),
+    ]);
 
-    return NextResponse.json(
-      customers.map((c) => ({
+    return NextResponse.json({
+      data: customers.map((c) => ({
         ...c,
         ordersCount: c._count.orders,
-      }))
-    );
+      })),
+      pagination: {
+        page,
+        pageSize,
+        totalCount,
+        totalPages: Math.ceil(totalCount / pageSize),
+      },
+    });
   } catch (error) {
     console.error("Customers GET error:", error);
     return NextResponse.json(

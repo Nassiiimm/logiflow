@@ -36,6 +36,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Plus, Search, Edit, Trash2, Mail, Phone, Loader2 } from "lucide-react";
 import { formatDate } from "@/lib/utils";
 import { toast } from "sonner";
+import { Pagination } from "@/components/ui/pagination";
 
 interface Customer {
   id: string;
@@ -62,6 +63,10 @@ export default function CustomersPage() {
     id: "",
     name: "",
   });
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
+  const [totalCount, setTotalCount] = useState(0);
+  const [totalPages, setTotalPages] = useState(0);
 
   const [formData, setFormData] = useState({
     name: "",
@@ -76,17 +81,26 @@ export default function CustomersPage() {
 
   useEffect(() => {
     fetchCustomers();
+  }, [searchTerm, currentPage, pageSize]);
+
+  useEffect(() => {
+    setCurrentPage(1);
   }, [searchTerm]);
 
   async function fetchCustomers() {
     try {
+      setLoading(true);
       const params = new URLSearchParams();
       if (searchTerm) params.set("search", searchTerm);
+      params.set("page", currentPage.toString());
+      params.set("pageSize", pageSize.toString());
 
       const res = await fetch(`/api/customers?${params}`);
       if (res.ok) {
         const data = await res.json();
-        setCustomers(data);
+        setCustomers(data.data);
+        setTotalCount(data.pagination.totalCount);
+        setTotalPages(data.pagination.totalPages);
       }
     } catch (error) {
       console.error("Failed to fetch customers:", error);
@@ -403,6 +417,19 @@ export default function CustomersPage() {
                 )}
               </TableBody>
             </Table>
+          )}
+          {!loading && totalCount > 0 && (
+            <Pagination
+              currentPage={currentPage}
+              totalPages={totalPages}
+              totalItems={totalCount}
+              pageSize={pageSize}
+              onPageChange={setCurrentPage}
+              onPageSizeChange={(size) => {
+                setPageSize(size);
+                setCurrentPage(1);
+              }}
+            />
           )}
         </div>
       </div>

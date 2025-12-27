@@ -9,6 +9,8 @@ export async function GET(request: NextRequest) {
     const status = searchParams.get("status");
     const search = searchParams.get("search");
     const customerId = searchParams.get("customerId");
+    const page = parseInt(searchParams.get("page") || "1");
+    const pageSize = parseInt(searchParams.get("pageSize") || "20");
 
     const where: Record<string, unknown> = {};
 
@@ -27,17 +29,30 @@ export async function GET(request: NextRequest) {
       ];
     }
 
-    const orders = await prisma.order.findMany({
-      where,
-      orderBy: { createdAt: "desc" },
-      include: {
-        customer: { select: { name: true } },
-        driver: { select: { user: { select: { name: true } } } },
-        vehicle: { select: { plateNumber: true } },
+    const [orders, totalCount] = await Promise.all([
+      prisma.order.findMany({
+        where,
+        orderBy: { createdAt: "desc" },
+        include: {
+          customer: { select: { name: true } },
+          driver: { select: { user: { select: { name: true } } } },
+          vehicle: { select: { plateNumber: true } },
+        },
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+      }),
+      prisma.order.count({ where }),
+    ]);
+
+    return NextResponse.json({
+      data: orders,
+      pagination: {
+        page,
+        pageSize,
+        totalCount,
+        totalPages: Math.ceil(totalCount / pageSize),
       },
     });
-
-    return NextResponse.json(orders);
   } catch (error) {
     console.error("Orders GET error:", error);
     return NextResponse.json(

@@ -9,9 +9,13 @@ export default function LoginPage() {
   const [csrfToken, setCsrfToken] = useState("");
 
   useEffect(() => {
-    fetch("/api/auth/csrf")
+    fetch("/api/auth/csrf", { credentials: "include" })
       .then((res) => res.json())
-      .then((data) => setCsrfToken(data.csrfToken));
+      .then((data) => {
+        console.log("CSRF token loaded:", data.csrfToken?.substring(0, 20));
+        setCsrfToken(data.csrfToken);
+      })
+      .catch((err) => console.error("CSRF fetch error:", err));
   }, []);
 
   return (
@@ -68,9 +72,10 @@ export default function LoginPage() {
 
           <button
             type="submit"
-            className="w-full py-2 px-4 bg-cyan-600 hover:bg-cyan-700 text-white font-medium rounded-md transition-colors"
+            disabled={!csrfToken}
+            className="w-full py-2 px-4 bg-cyan-600 hover:bg-cyan-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white font-medium rounded-md transition-colors"
           >
-            Se connecter
+            {csrfToken ? "Se connecter" : "Chargement..."}
           </button>
         </form>
 

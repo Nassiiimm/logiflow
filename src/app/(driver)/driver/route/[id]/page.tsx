@@ -28,9 +28,11 @@ import {
   User,
   ChevronDown,
   ChevronUp,
+  Map,
 } from "lucide-react";
 import { toast } from "sonner";
 import Link from "next/link";
+import { generateGoogleMapsRouteUrl } from "@/lib/utils";
 
 interface StopPackage {
   id: string;
@@ -178,6 +180,33 @@ export default function DriverRoutePage() {
     // Try Google Maps first, fallback to Apple Maps on iOS
     const googleMapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${address}`;
     window.open(googleMapsUrl, "_blank");
+  }
+
+  function openFullRouteInMaps() {
+    if (!route) return;
+
+    // Filter only pending/in-progress stops for navigation
+    const pendingStops = route.stops.filter(
+      (s) => s.status === "PENDING" || s.status === "IN_PROGRESS" || s.status === "ARRIVED"
+    );
+
+    if (pendingStops.length === 0) {
+      toast.error("Aucun stop restant a naviguer");
+      return;
+    }
+
+    const result = generateGoogleMapsRouteUrl(pendingStops, currentLocation);
+
+    if (!result) {
+      toast.error("Impossible de generer l'itineraire");
+      return;
+    }
+
+    if (result.truncated) {
+      toast.info(`Route tronquee: ${result.includedStops}/${result.totalStops} stops inclus (limite Google Maps)`);
+    }
+
+    window.open(result.url, "_blank");
   }
 
   // Signature canvas handling
@@ -393,6 +422,15 @@ export default function DriverRoutePage() {
               </Badge>
             )}
           </div>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="text-white hover:bg-white/20"
+            onClick={openFullRouteInMaps}
+            title="Ouvrir route complete dans Maps"
+          >
+            <Map className="h-5 w-5" />
+          </Button>
           <div className="text-right text-sm">
             <p>{route.completedStops}/{route.totalStops} stops</p>
             <p>{progress}%</p>

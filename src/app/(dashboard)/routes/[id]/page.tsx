@@ -40,8 +40,9 @@ import {
   Trash2,
   Play,
   Edit,
+  Map,
 } from "lucide-react";
-import { formatDate } from "@/lib/utils";
+import { formatDate, generateGoogleMapsRouteUrl } from "@/lib/utils";
 import { toast } from "sonner";
 import Link from "next/link";
 
@@ -252,6 +253,27 @@ export default function RouteDetailPage() {
     }
   }
 
+  function openFullRouteInMaps() {
+    if (!route || route.stops.length === 0) {
+      toast.error("Aucun stop dans cette route");
+      return;
+    }
+
+    // For dashboard, show all stops (not filtered by status)
+    const result = generateGoogleMapsRouteUrl(route.stops);
+
+    if (!result) {
+      toast.error("Impossible de generer l'itineraire");
+      return;
+    }
+
+    if (result.truncated) {
+      toast.info(`Route tronquee: ${result.includedStops}/${result.totalStops} stops inclus (limite Google Maps)`);
+    }
+
+    window.open(result.url, "_blank");
+  }
+
   if (loading) {
     return (
       <div className="flex flex-col h-full">
@@ -285,6 +307,12 @@ export default function RouteDetailPage() {
             </Button>
           </Link>
           <div className="flex gap-2">
+            {route.stops.length > 0 && (
+              <Button variant="outline" onClick={openFullRouteInMaps}>
+                <Map className="mr-2 h-4 w-4" />
+                Ouvrir dans Maps
+              </Button>
+            )}
             {route.status === "DRAFT" && route.totalStops > 0 && (
               <Button onClick={handleStartRoute}>
                 <Play className="mr-2 h-4 w-4" />

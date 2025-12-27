@@ -84,3 +84,78 @@ export function getStatusLabel(status: string): string {
   };
   return labels[status] || status;
 }
+
+interface RouteStopForMaps {
+  address: string;
+  city: string;
+  postalCode: string;
+}
+
+interface GoogleMapsRouteResult {
+  url: string;
+  truncated: boolean;
+  totalStops: number;
+  includedStops: number;
+}
+
+const MAX_WAYPOINTS = 8;
+
+export function generateGoogleMapsRouteUrl(
+  stops: RouteStopForMaps[],
+  currentLocation?: { lat: number; lng: number } | null
+): GoogleMapsRouteResult | null {
+  if (!stops || stops.length === 0) {
+    return null;
+  }
+
+  const formatAddress = (stop: RouteStopForMaps): string => {
+    return encodeURIComponent(`${stop.address}, ${stop.postalCode} ${stop.city}`);
+  };
+
+  // Single stop - simple navigation
+  if (stops.length === 1) {
+    const destination = formatAddress(stops[0]);
+    const origin = currentLocation
+      ? `${currentLocation.lat},${currentLocation.lng}`
+      : "";
+
+    const url = origin
+      ? `https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${destination}&travelmode=driving`
+      : `https://www.google.com/maps/dir/?api=1&destination=${destination}&travelmode=driving`;
+
+    return { url, truncated: false, totalStops: 1, includedStops: 1 };
+  }
+
+  // Multiple stops
+  const origin = currentLocation
+    ? `${currentLocation.lat},${currentLocation.lng}`
+    : formatAddress(stops[0]);
+
+  const destination = formatAddress(stops[stops.length - 1]);
+
+  // Waypoints are stops between origin and destination
+  const waypointStops = currentLocation
+    ? stops.slice(0, -1) // All except last if we use current location as origin
+    : stops.slice(1, -1); // All except first and last
+
+  const truncated = waypointStops.length > MAX_WAYPOINTS;
+  const includedWaypoints = waypointStops.slice(0, MAX_WAYPOINTS);
+
+  let url = `https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${destination}&travelmode=driving`;
+
+  if (includedWaypoints.length > 0) {
+    const waypointsStr = includedWaypoints
+      .map((stop) => formatAddress(stop))
+      .join("|");
+    url += `&waypoints=${waypointsStr}`;
+  }
+
+  return {
+    url,
+    truncated,
+    totalStops: stops.length,
+    includedStops: currentLocation
+      ? Math.min(stops.length, MAX_WAYPOINTS + 1)
+      : Math.min(stops.length, MAX_WAYPOINTS + 2),
+  };
+}

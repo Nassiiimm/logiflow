@@ -1,77 +1,18 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Truck, Loader2 } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { Truck } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { toast } from "sonner";
 
 export default function LoginPage() {
-  const [isLoading, setIsLoading] = useState(false);
+  const [csrfToken, setCsrfToken] = useState("");
 
-  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    setIsLoading(true);
-
-    const formData = new FormData(e.currentTarget);
-    const email = formData.get("email") as string;
-    const password = formData.get("password") as string;
-
-    if (!email || !password) {
-      toast.error("Veuillez remplir tous les champs");
-      setIsLoading(false);
-      return;
-    }
-
-    try {
-      // Get CSRF token first (with credentials to get cookies)
-      const csrfRes = await fetch("/api/auth/csrf", {
-        credentials: "include",
-      });
-      const csrfData = await csrfRes.json();
-      const csrfToken = csrfData.csrfToken;
-
-      // Submit to NextAuth callback
-      const res = await fetch("/api/auth/callback/credentials", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/x-www-form-urlencoded",
-        },
-        body: new URLSearchParams({
-          csrfToken,
-          email,
-          password,
-        }),
-        credentials: "include",
-        redirect: "manual",
-      });
-
-      // With redirect: "manual", success returns opaqueredirect
-      if (res.type === "opaqueredirect") {
-        toast.success("Connexion reussie !");
-        window.location.href = "/dashboard";
-        return;
-      }
-
-      // Check URL for error
-      if (res.url?.includes("error")) {
-        toast.error("Email ou mot de passe incorrect");
-        setIsLoading(false);
-        return;
-      }
-
-      // Default: try to redirect
-      toast.success("Connexion reussie !");
-      window.location.href = "/dashboard";
-    } catch (err) {
-      console.error("Login error:", err);
-      toast.error("Une erreur est survenue");
-      setIsLoading(false);
-    }
-  };
+  useEffect(() => {
+    fetch("/api/auth/csrf")
+      .then((res) => res.json())
+      .then((data) => setCsrfToken(data.csrfToken));
+  }, []);
 
   return (
     <Card className="w-full max-w-md bg-[#12121a] border-zinc-800/50">
@@ -88,38 +29,51 @@ export default function LoginPage() {
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <form onSubmit={handleSubmit} className="space-y-4">
+        {/* Native HTML form - submits directly to NextAuth */}
+        <form
+          method="POST"
+          action="/api/auth/callback/credentials"
+          className="space-y-4"
+        >
+          <input type="hidden" name="csrfToken" value={csrfToken} />
+          <input type="hidden" name="callbackUrl" value="/dashboard" />
+
           <div className="space-y-2">
-            <Label htmlFor="email">Email</Label>
-            <Input
+            <label htmlFor="email" className="text-sm font-medium text-zinc-200">
+              Email
+            </label>
+            <input
               id="email"
               name="email"
               type="email"
               placeholder="admin@logiflow.fr"
-              autoComplete="email"
+              required
+              className="w-full px-3 py-2 bg-zinc-900 border border-zinc-700 rounded-md text-zinc-100 placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-cyan-500"
             />
           </div>
+
           <div className="space-y-2">
-            <Label htmlFor="password">Mot de passe</Label>
-            <Input
+            <label htmlFor="password" className="text-sm font-medium text-zinc-200">
+              Mot de passe
+            </label>
+            <input
               id="password"
               name="password"
               type="password"
               placeholder="Votre mot de passe"
-              autoComplete="current-password"
+              required
+              className="w-full px-3 py-2 bg-zinc-900 border border-zinc-700 rounded-md text-zinc-100 placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-cyan-500"
             />
           </div>
-          <Button type="submit" className="w-full bg-cyan-600 hover:bg-cyan-700" disabled={isLoading}>
-            {isLoading ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Connexion...
-              </>
-            ) : (
-              "Se connecter"
-            )}
-          </Button>
+
+          <button
+            type="submit"
+            className="w-full py-2 px-4 bg-cyan-600 hover:bg-cyan-700 text-white font-medium rounded-md transition-colors"
+          >
+            Se connecter
+          </button>
         </form>
+
         <div className="mt-4 text-center text-sm">
           <span className="text-zinc-500">Pas encore de compte ? </span>
           <Link href="/register" className="text-cyan-400 hover:text-cyan-300 hover:underline">

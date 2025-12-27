@@ -38,19 +38,6 @@ function checkRateLimit(ip: string): { allowed: boolean; resetIn: number } {
 export async function middleware(request: NextRequest) {
   const path = request.nextUrl.pathname;
 
-  // Rate limit login attempts
-  if (path === "/api/auth/callback/credentials" && request.method === "POST") {
-    const ip = getClientIp(request);
-    const { allowed, resetIn } = checkRateLimit(ip);
-
-    if (!allowed) {
-      return NextResponse.json(
-        { error: "Trop de tentatives", message: `Reessayez dans ${resetIn}s` },
-        { status: 429, headers: { "Retry-After": String(resetIn) } }
-      );
-    }
-  }
-
   // Protected routes check
   const protectedPaths = [
     "/dashboard", "/orders", "/routes", "/packages",
@@ -94,6 +81,5 @@ export const config = {
     "/invoices/:path*",
     "/settings/:path*",
     "/driver/:path*",
-    "/api/auth/callback/credentials",
   ],
 };

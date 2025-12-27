@@ -11,8 +11,14 @@ export async function GET() {
     });
 
     if (existingAdmin) {
+      // Reset password
+      const hashedPassword = await bcrypt.hash("Admin123!", 12);
+      await prisma.user.update({
+        where: { email: "admin@logiflow.fr" },
+        data: { password: hashedPassword }
+      });
       return NextResponse.json({
-        message: "Admin already exists",
+        message: "Admin password reset",
         email: existingAdmin.email
       });
     }

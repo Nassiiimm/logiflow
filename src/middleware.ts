@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
-import { auth } from "@/lib/auth";
+import { getToken } from "next-auth/jwt";
 
-// Simple in-memory rate limit store (resets on server restart)
+// Simple in-memory rate limit store
 const loginAttempts = new Map<string, { count: number; resetTime: number }>();
 
 function getClientIp(request: NextRequest): string {
@@ -10,16 +10,12 @@ function getClientIp(request: NextRequest): string {
   if (forwardedFor) {
     return forwardedFor.split(",")[0].trim();
   }
-  const realIp = request.headers.get("x-real-ip");
-  if (realIp) {
-    return realIp;
-  }
-  return "127.0.0.1";
+  return request.headers.get("x-real-ip") || "127.0.0.1";
 }
 
-function checkRateLimit(ip: string): { allowed: boolean; remaining: number; resetIn: number } {
+function checkRateLimit(ip: string): { allowed: boolean; resetIn: number } {
   const now = Date.now();
-  const windowMs = 60 * 1000; // 1 minute
+  const windowMs = 60 * 1000;
   const maxAttempts = 5;
 
   let entry = loginAttempts.get(ip);
@@ -27,24 +23,16 @@ function checkRateLimit(ip: string): { allowed: boolean; remaining: number; rese
   if (!entry || entry.resetTime < now) {
     entry = { count: 1, resetTime: now + windowMs };
     loginAttempts.set(ip, entry);
-    return { allowed: true, remaining: maxAttempts - 1, resetIn: 60 };
+    return { allowed: true, resetIn: 60 };
   }
 
   entry.count++;
 
   if (entry.count > maxAttempts) {
-    return {
-      allowed: false,
-      remaining: 0,
-      resetIn: Math.ceil((entry.resetTime - now) / 1000),
-    };
+    return { allowed: false, resetIn: Math.ceil((entry.resetTime - now) / 1000) };
   }
 
-  return {
-    allowed: true,
-    remaining: maxAttempts - entry.count,
-    resetIn: Math.ceil((entry.resetTime - now) / 1000),
-  };
+  return { allowed: true, resetIn: Math.ceil((entry.resetTime - now) / 1000) };
 }
 
 export async function middleware(request: NextRequest) {
@@ -53,51 +41,40 @@ export async function middleware(request: NextRequest) {
   // Rate limit login attempts
   if (path === "/api/auth/callback/credentials" && request.method === "POST") {
     const ip = getClientIp(request);
-    const { allowed, remaining, resetIn } = checkRateLimit(ip);
+    const { allowed, resetIn } = checkRateLimit(ip);
 
     if (!allowed) {
       return NextResponse.json(
-        {
-          error: "Trop de tentatives de connexion",
-          message: `Reessayez dans ${resetIn} secondes`,
-        },
-        {
-          status: 429,
-          headers: {
-            "X-RateLimit-Remaining": "0",
-            "X-RateLimit-Reset": String(resetIn),
-            "Retry-After": String(resetIn),
-          },
-        }
+        { error: "Trop de tentatives", message: `Reessayez dans ${resetIn}s` },
+        { status: 429, headers: { "Retry-After": String(resetIn) } }
       );
     }
   }
 
-  // Protect dashboard routes
-  if (path.startsWith("/dashboard") || path.startsWith("/orders") ||
-      path.startsWith("/routes") || path.startsWith("/packages") ||
-      path.startsWith("/customers") || path.startsWith("/contracts") ||
-      path.startsWith("/fleet") || path.startsWith("/warehouses") ||
-      path.startsWith("/invoices") || path.startsWith("/settings")) {
+  // Protected routes check
+  const protectedPaths = [
+    "/dashboard", "/orders", "/routes", "/packages",
+    "/customers", "/contracts", "/fleet", "/warehouses",
+    "/invoices", "/settings", "/driver"
+  ];
 
-    const session = await auth();
+  const isProtected = protectedPaths.some(p => path.startsWith(p));
 
-    if (!session) {
-      return NextResponse.redirect(new URL("/login", request.url));
-    }
-  }
+  if (isProtected) {
+    const token = await getToken({
+      req: request,
+      secret: process.env.NEXTAUTH_SECRET,
+    });
 
-  // Protect driver routes
-  if (path.startsWith("/driver")) {
-    const session = await auth();
-
-    if (!session) {
+    if (!token) {
       return NextResponse.redirect(new URL("/login", request.url));
     }
 
-    // Check if user is a driver
-    if (session.user.role !== "DRIVER" && session.user.role !== "ADMIN") {
-      return NextResponse.redirect(new URL("/dashboard", request.url));
+    // Driver routes - check role
+    if (path.startsWith("/driver")) {
+      if (token.role !== "DRIVER" && token.role !== "ADMIN") {
+        return NextResponse.redirect(new URL("/dashboard", request.url));
+      }
     }
   }
 

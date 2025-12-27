@@ -1,87 +1,5 @@
 # LogiFlow - Code Source Complet
 
-## Table des matieres
-
-- prisma/seed.ts
-- src/app/(auth)/layout.tsx
-- src/app/(auth)/login/page.tsx
-- src/app/(auth)/register/page.tsx
-- src/app/(dashboard)/contracts/page.tsx
-- src/app/(dashboard)/customers/page.tsx
-- src/app/(dashboard)/dashboard/page.tsx
-- src/app/(dashboard)/fleet/page.tsx
-- src/app/(dashboard)/invoices/page.tsx
-- src/app/(dashboard)/layout.tsx
-- src/app/(dashboard)/orders/page.tsx
-- src/app/(dashboard)/packages/page.tsx
-- src/app/(dashboard)/routes/[id]/page.tsx
-- src/app/(dashboard)/routes/page.tsx
-- src/app/(dashboard)/settings/page.tsx
-- src/app/(dashboard)/warehouses/page.tsx
-- src/app/(driver)/driver/page.tsx
-- src/app/(driver)/driver/route/[id]/page.tsx
-- src/app/(driver)/layout.tsx
-- src/app/api/auth/[...nextauth]/route.ts
-- src/app/api/auth/register/route.ts
-- src/app/api/contracts/[id]/route.ts
-- src/app/api/contracts/route.ts
-- src/app/api/customers/[id]/route.ts
-- src/app/api/customers/route.ts
-- src/app/api/dashboard/route.ts
-- src/app/api/drivers/[id]/route.ts
-- src/app/api/drivers/route.ts
-- src/app/api/invoices/route.ts
-- src/app/api/orders/[id]/route.ts
-- src/app/api/orders/route.ts
-- src/app/api/packages/create-route/route.ts
-- src/app/api/packages/route.ts
-- src/app/api/routes/[id]/route.ts
-- src/app/api/routes/[id]/stops/[stopId]/route.ts
-- src/app/api/routes/[id]/stops/route.ts
-- src/app/api/routes/import/route.ts
-- src/app/api/routes/route.ts
-- src/app/api/tracking/route.ts
-- src/app/api/vehicles/[id]/route.ts
-- src/app/api/vehicles/route.ts
-- src/app/api/warehouses/[id]/route.ts
-- src/app/api/warehouses/route.ts
-- src/app/layout.tsx
-- src/app/page.tsx
-- src/app/tracking/page.tsx
-- src/components/dashboard/delivery-chart.tsx
-- src/components/dashboard/header.tsx
-- src/components/dashboard/recent-orders.tsx
-- src/components/dashboard/sidebar.tsx
-- src/components/dashboard/stats-card.tsx
-- src/components/providers.tsx
-- src/components/ui/alert-dialog.tsx
-- src/components/ui/avatar.tsx
-- src/components/ui/badge.tsx
-- src/components/ui/button.tsx
-- src/components/ui/card.tsx
-- src/components/ui/checkbox.tsx
-- src/components/ui/dialog.tsx
-- src/components/ui/dropdown-menu.tsx
-- src/components/ui/form.tsx
-- src/components/ui/input.tsx
-- src/components/ui/label.tsx
-- src/components/ui/select.tsx
-- src/components/ui/separator.tsx
-- src/components/ui/sheet.tsx
-- src/components/ui/sonner.tsx
-- src/components/ui/table.tsx
-- src/components/ui/tabs.tsx
-- src/components/ui/textarea.tsx
-- src/lib/auth.ts
-- src/lib/prisma.ts
-- src/lib/rate-limit.ts
-- src/lib/utils.ts
-- src/lib/validations.ts
-- src/middleware.ts
-- src/types/next-auth.d.ts
-
----
-
 ## prisma/seed.ts
 ```tsx
 import { PrismaClient } from "@prisma/client";
@@ -1694,7 +1612,6 @@ export default function CustomersPage() {
 ```tsx
 "use client";
 
-import { useEffect, useState } from "react";
 import { Header } from "@/components/dashboard/header";
 import { StatsCard } from "@/components/dashboard/stats-card";
 import { Badge } from "@/components/ui/badge";
@@ -1715,58 +1632,14 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from "recharts";
-import { Package, Truck, CheckCircle, Clock, Users, User } from "lucide-react";
+import { Package, Truck, CheckCircle, Clock, Users, User, RefreshCw } from "lucide-react";
 import { getStatusColor, getStatusLabel } from "@/lib/utils";
-
-interface DashboardData {
-  stats: {
-    ordersToday: number;
-    ordersInTransit: number;
-    ordersDeliveredToday: number;
-    ordersPending: number;
-    totalVehicles: number;
-    vehiclesAvailable: number;
-    vehiclesMaintenance: number;
-    totalCustomers: number;
-    totalDrivers: number;
-  };
-  recentOrders: Array<{
-    id: string;
-    trackingNumber: string;
-    customer: string;
-    destination: string;
-    status: string;
-    date: string;
-  }>;
-  chartData: Array<{
-    name: string;
-    commandes: number;
-    livraisons: number;
-  }>;
-}
+import { useDashboardStats } from "@/hooks/use-queries";
 
 export default function DashboardPage() {
-  const [data, setData] = useState<DashboardData | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { data, isLoading, dataUpdatedAt } = useDashboardStats();
 
-  useEffect(() => {
-    async function fetchData() {
-      try {
-        const res = await fetch("/api/dashboard");
-        if (res.ok) {
-          const json = await res.json();
-          setData(json);
-        }
-      } catch (error) {
-        console.error("Failed to fetch dashboard data:", error);
-      } finally {
-        setLoading(false);
-      }
-    }
-    fetchData();
-  }, []);
-
-  if (loading) {
+  if (isLoading) {
     return (
       <div className="flex flex-col h-full">
         <Header title="Dashboard" />
@@ -1794,6 +1667,15 @@ export default function DashboardPage() {
       <Header title="Dashboard" />
 
       <div className="flex-1 p-6 space-y-6">
+        {/* Auto-refresh indicator */}
+        <div className="flex items-center justify-end gap-2 text-xs text-zinc-500">
+          <RefreshCw className="h-3 w-3" />
+          <span>
+            Actualise automatiquement toutes les 15s
+            {dataUpdatedAt && ` • Derniere MaJ: ${new Date(dataUpdatedAt).toLocaleTimeString()}`}
+          </span>
+        </div>
+
         {/* Stats Cards */}
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
           <StatsCard
@@ -1932,7 +1814,7 @@ export default function DashboardPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {(data?.recentOrders || []).map((order) => (
+                {(data?.recentOrders || []).map((order: any) => (
                   <TableRow key={order.id} className="border-zinc-800/50 hover:bg-zinc-800/30">
                     <TableCell className="font-medium text-zinc-200">{order.trackingNumber}</TableCell>
                     <TableCell className="text-zinc-300">{order.customer}</TableCell>
@@ -10895,13 +10777,14 @@ export default function Home() {
 ```tsx
 "use client";
 
-import { useState } from "react";
-import { Truck, Package, MapPin, CheckCircle, Clock, Search, Loader2 } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Truck, Package, MapPin, CheckCircle, Clock, Search, Loader2, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { getStatusColor, getStatusLabel, formatDate } from "@/lib/utils";
+import { useTracking } from "@/hooks/use-queries";
 
 interface TrackingEvent {
   id: string;
@@ -10924,33 +10807,15 @@ interface TrackingResult {
 }
 
 export default function TrackingPage() {
-  const [trackingNumber, setTrackingNumber] = useState("");
-  const [trackingResult, setTrackingResult] = useState<TrackingResult | null>(null);
-  const [isSearching, setIsSearching] = useState(false);
-  const [error, setError] = useState("");
+  const [searchInput, setSearchInput] = useState("");
+  const [activeTrackingNumber, setActiveTrackingNumber] = useState("");
 
-  const handleSearch = async (e: React.FormEvent) => {
+  const { data: trackingResult, isLoading, error, dataUpdatedAt } = useTracking(activeTrackingNumber);
+
+  const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!trackingNumber.trim()) return;
-
-    setIsSearching(true);
-    setError("");
-    setTrackingResult(null);
-
-    try {
-      const res = await fetch(`/api/tracking?number=${encodeURIComponent(trackingNumber)}`);
-      const data = await res.json();
-
-      if (res.ok) {
-        setTrackingResult(data);
-      } else {
-        setError(data.error || "Commande non trouvée");
-      }
-    } catch (err) {
-      setError("Erreur lors de la recherche");
-    } finally {
-      setIsSearching(false);
-    }
+    if (!searchInput.trim()) return;
+    setActiveTrackingNumber(searchInput.trim());
   };
 
   const getEventIcon = (type: string) => {
@@ -10973,16 +10838,16 @@ export default function TrackingPage() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="min-h-screen bg-[#0a0a0f]">
       {/* Header */}
-      <header className="bg-slate-900 text-white py-8">
+      <header className="bg-[#12121a] border-b border-zinc-800/50 py-8">
         <div className="container mx-auto px-4">
           <div className="flex items-center justify-center gap-2 mb-6">
-            <Truck className="h-10 w-10 text-blue-500" />
-            <span className="text-3xl font-bold">LogiFlow</span>
+            <Truck className="h-10 w-10 text-cyan-500" />
+            <span className="text-3xl font-bold text-white">LogiFlow</span>
           </div>
-          <h1 className="text-2xl font-bold text-center mb-2">Suivi de commande</h1>
-          <p className="text-slate-400 text-center">
+          <h1 className="text-2xl font-bold text-center text-white mb-2">Suivi de commande</h1>
+          <p className="text-zinc-400 text-center">
             Entrez votre numero de suivi pour localiser votre colis
           </p>
         </div>
@@ -10990,20 +10855,20 @@ export default function TrackingPage() {
 
       {/* Search */}
       <div className="container mx-auto px-4 -mt-6">
-        <Card className="max-w-2xl mx-auto">
+        <Card className="max-w-2xl mx-auto bg-[#12121a] border-zinc-800/50">
           <CardContent className="p-6">
             <form onSubmit={handleSearch} className="flex gap-4">
               <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
+                <Search className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-zinc-500" />
                 <Input
                   placeholder="Ex: LF2024001"
-                  value={trackingNumber}
-                  onChange={(e) => setTrackingNumber(e.target.value.toUpperCase())}
+                  value={searchInput}
+                  onChange={(e) => setSearchInput(e.target.value.toUpperCase())}
                   className="pl-10 h-12 text-lg"
                 />
               </div>
-              <Button type="submit" size="lg" disabled={isSearching}>
-                {isSearching ? (
+              <Button type="submit" size="lg" className="bg-cyan-600 hover:bg-cyan-700" disabled={isLoading}>
+                {isLoading ? (
                   <Loader2 className="h-5 w-5 animate-spin" />
                 ) : (
                   "Suivre"
@@ -11011,7 +10876,7 @@ export default function TrackingPage() {
               </Button>
             </form>
             {error && (
-              <p className="mt-4 text-red-500 text-center">{error}</p>
+              <p className="mt-4 text-red-400 text-center">Commande non trouvee</p>
             )}
           </CardContent>
         </Card>
@@ -11021,13 +10886,22 @@ export default function TrackingPage() {
       {trackingResult && (
         <div className="container mx-auto px-4 py-8">
           <div className="max-w-4xl mx-auto space-y-6">
+            {/* Auto-refresh indicator */}
+            <div className="flex items-center justify-center gap-2 text-xs text-zinc-500">
+              <RefreshCw className="h-3 w-3" />
+              <span>
+                Actualise automatiquement toutes les 15s
+                {dataUpdatedAt && ` • ${new Date(dataUpdatedAt).toLocaleTimeString()}`}
+              </span>
+            </div>
+
             {/* Status Card */}
-            <Card>
+            <Card className="bg-[#12121a] border-zinc-800/50">
               <CardHeader>
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm text-slate-500">Numero de suivi</p>
-                    <CardTitle className="text-2xl">{trackingResult.trackingNumber}</CardTitle>
+                    <p className="text-sm text-zinc-500">Numero de suivi</p>
+                    <CardTitle className="text-2xl text-white">{trackingResult.trackingNumber}</CardTitle>
                   </div>
                   <Badge className={`${getStatusColor(trackingResult.status)} text-lg px-4 py-2`}>
                     {getStatusLabel(trackingResult.status)}
@@ -11038,35 +10912,35 @@ export default function TrackingPage() {
                 <div className="grid md:grid-cols-2 gap-6">
                   <div className="space-y-4">
                     <div>
-                      <p className="text-sm text-slate-500">Adresse de ramassage</p>
+                      <p className="text-sm text-zinc-500">Adresse de ramassage</p>
                       <div className="flex items-start gap-2 mt-1">
-                        <MapPin className="h-5 w-5 text-blue-500 mt-0.5" />
-                        <p className="font-medium">{trackingResult.pickupAddress}</p>
+                        <MapPin className="h-5 w-5 text-cyan-500 mt-0.5" />
+                        <p className="font-medium text-zinc-200">{trackingResult.pickupAddress}</p>
                       </div>
                     </div>
                     <div>
-                      <p className="text-sm text-slate-500">Adresse de livraison</p>
+                      <p className="text-sm text-zinc-500">Adresse de livraison</p>
                       <div className="flex items-start gap-2 mt-1">
-                        <MapPin className="h-5 w-5 text-green-500 mt-0.5" />
-                        <p className="font-medium">{trackingResult.deliveryAddress}</p>
+                        <MapPin className="h-5 w-5 text-emerald-500 mt-0.5" />
+                        <p className="font-medium text-zinc-200">{trackingResult.deliveryAddress}</p>
                       </div>
                     </div>
                   </div>
                   <div className="space-y-4">
                     {trackingResult.estimatedDelivery && (
                       <div>
-                        <p className="text-sm text-slate-500">Livraison estimee</p>
-                        <p className="text-lg font-semibold text-blue-600">
+                        <p className="text-sm text-zinc-500">Livraison estimee</p>
+                        <p className="text-lg font-semibold text-cyan-400">
                           {formatDate(trackingResult.estimatedDelivery)}
                         </p>
                       </div>
                     )}
                     {trackingResult.driver && (
                       <div>
-                        <p className="text-sm text-slate-500">Chauffeur</p>
-                        <p className="font-medium">{trackingResult.driver}</p>
+                        <p className="text-sm text-zinc-500">Chauffeur</p>
+                        <p className="font-medium text-zinc-200">{trackingResult.driver}</p>
                         {trackingResult.vehicle && (
-                          <p className="text-sm text-slate-500">Vehicule: {trackingResult.vehicle}</p>
+                          <p className="text-sm text-zinc-500">Vehicule: {trackingResult.vehicle}</p>
                         )}
                       </div>
                     )}
@@ -11076,36 +10950,36 @@ export default function TrackingPage() {
             </Card>
 
             {/* Timeline */}
-            <Card>
+            <Card className="bg-[#12121a] border-zinc-800/50">
               <CardHeader>
-                <CardTitle>Historique de suivi</CardTitle>
+                <CardTitle className="text-white">Historique de suivi</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="relative">
                   {trackingResult.events.length === 0 ? (
-                    <p className="text-center text-slate-500 py-4">Aucun evenement de suivi</p>
+                    <p className="text-center text-zinc-500 py-4">Aucun evenement de suivi</p>
                   ) : (
-                    trackingResult.events.map((event, index) => (
+                    trackingResult.events.map((event: TrackingEvent, index: number) => (
                       <div key={event.id} className="flex gap-4 pb-8 last:pb-0">
                         {/* Timeline line */}
                         <div className="flex flex-col items-center">
                           <div
                             className={`rounded-full p-2 ${
-                              index === trackingResult.events.length - 1
-                                ? "bg-blue-500 text-white"
-                                : "bg-slate-100 text-slate-500"
+                              index === 0
+                                ? "bg-cyan-500 text-white"
+                                : "bg-zinc-800 text-zinc-400"
                             }`}
                           >
                             {getEventIcon(event.type)}
                           </div>
                           {index < trackingResult.events.length - 1 && (
-                            <div className="w-0.5 h-full bg-slate-200 mt-2" />
+                            <div className="w-0.5 h-full bg-zinc-800 mt-2" />
                           )}
                         </div>
                         {/* Content */}
                         <div className="flex-1 pt-1">
-                          <p className="font-medium">{event.description}</p>
-                          <div className="flex items-center gap-4 mt-1 text-sm text-slate-500">
+                          <p className="font-medium text-zinc-200">{event.description}</p>
+                          <div className="flex items-center gap-4 mt-1 text-sm text-zinc-500">
                             <span>{formatDate(event.timestamp)}</span>
                             {event.location && (
                               <span className="flex items-center gap-1">
@@ -11126,9 +11000,9 @@ export default function TrackingPage() {
       )}
 
       {/* Footer */}
-      <footer className="bg-slate-900 text-white py-8 mt-auto">
+      <footer className="bg-[#12121a] border-t border-zinc-800/50 py-8 mt-auto">
         <div className="container mx-auto px-4 text-center">
-          <p className="text-slate-400">
+          <p className="text-zinc-500">
             2024 LogiFlow - Plateforme de gestion logistique
           </p>
         </div>
@@ -11585,9 +11459,27 @@ export function StatsCard({
 "use client";
 
 import { SessionProvider } from "next-auth/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { useState } from "react";
 
 export function Providers({ children }: { children: React.ReactNode }) {
-  return <SessionProvider>{children}</SessionProvider>;
+  const [queryClient] = useState(
+    () =>
+      new QueryClient({
+        defaultOptions: {
+          queries: {
+            staleTime: 10 * 1000, // 10 seconds
+            refetchOnWindowFocus: true,
+          },
+        },
+      })
+  );
+
+  return (
+    <QueryClientProvider client={queryClient}>
+      <SessionProvider>{children}</SessionProvider>
+    </QueryClientProvider>
+  );
 }
 
 ```
@@ -13330,6 +13222,151 @@ function Textarea({ className, ...props }: React.ComponentProps<"textarea">) {
 }
 
 export { Textarea }
+
+```
+
+## src/hooks/use-queries.ts
+```tsx
+"use client";
+
+import { useQuery } from "@tanstack/react-query";
+
+const POLLING_INTERVAL = 15000; // 15 seconds
+
+// Dashboard stats
+export function useDashboardStats() {
+  return useQuery({
+    queryKey: ["dashboard-stats"],
+    queryFn: async () => {
+      const res = await fetch("/api/dashboard");
+      if (!res.ok) throw new Error("Failed to fetch dashboard stats");
+      return res.json();
+    },
+    refetchInterval: POLLING_INTERVAL,
+  });
+}
+
+// Routes list
+export function useRoutes(filters?: {
+  search?: string;
+  status?: string;
+  contractId?: string;
+  date?: string;
+}) {
+  const params = new URLSearchParams();
+  if (filters?.search) params.set("search", filters.search);
+  if (filters?.status) params.set("status", filters.status);
+  if (filters?.contractId) params.set("contractId", filters.contractId);
+  if (filters?.date) params.set("date", filters.date);
+
+  return useQuery({
+    queryKey: ["routes", filters],
+    queryFn: async () => {
+      const res = await fetch(`/api/routes?${params.toString()}`);
+      if (!res.ok) throw new Error("Failed to fetch routes");
+      return res.json();
+    },
+    refetchInterval: POLLING_INTERVAL,
+  });
+}
+
+// Single route detail
+export function useRoute(id: string) {
+  return useQuery({
+    queryKey: ["route", id],
+    queryFn: async () => {
+      const res = await fetch(`/api/routes/${id}`);
+      if (!res.ok) throw new Error("Failed to fetch route");
+      return res.json();
+    },
+    refetchInterval: POLLING_INTERVAL,
+    enabled: !!id,
+  });
+}
+
+// Orders list
+export function useOrders(filters?: {
+  search?: string;
+  status?: string;
+}) {
+  const params = new URLSearchParams();
+  if (filters?.search) params.set("search", filters.search);
+  if (filters?.status) params.set("status", filters.status);
+
+  return useQuery({
+    queryKey: ["orders", filters],
+    queryFn: async () => {
+      const res = await fetch(`/api/orders?${params.toString()}`);
+      if (!res.ok) throw new Error("Failed to fetch orders");
+      return res.json();
+    },
+    refetchInterval: POLLING_INTERVAL,
+  });
+}
+
+// Tracking (public)
+export function useTracking(trackingNumber: string) {
+  return useQuery({
+    queryKey: ["tracking", trackingNumber],
+    queryFn: async () => {
+      const res = await fetch(`/api/tracking?number=${trackingNumber}`);
+      if (!res.ok) throw new Error("Failed to fetch tracking");
+      return res.json();
+    },
+    refetchInterval: POLLING_INTERVAL,
+    enabled: !!trackingNumber,
+  });
+}
+
+// Contracts
+export function useContracts() {
+  return useQuery({
+    queryKey: ["contracts"],
+    queryFn: async () => {
+      const res = await fetch("/api/contracts");
+      if (!res.ok) throw new Error("Failed to fetch contracts");
+      return res.json();
+    },
+  });
+}
+
+// Drivers
+export function useDrivers() {
+  return useQuery({
+    queryKey: ["drivers"],
+    queryFn: async () => {
+      const res = await fetch("/api/drivers");
+      if (!res.ok) throw new Error("Failed to fetch drivers");
+      return res.json();
+    },
+  });
+}
+
+// Vehicles
+export function useVehicles() {
+  return useQuery({
+    queryKey: ["vehicles"],
+    queryFn: async () => {
+      const res = await fetch("/api/vehicles");
+      if (!res.ok) throw new Error("Failed to fetch vehicles");
+      return res.json();
+    },
+  });
+}
+
+// Driver's assigned routes
+export function useDriverRoutes(driverId: string) {
+  return useQuery({
+    queryKey: ["driver-routes", driverId],
+    queryFn: async () => {
+      const res = await fetch(`/api/routes?driverId=${driverId}`);
+      if (!res.ok) throw new Error("Failed to fetch driver routes");
+      return res.json();
+    },
+    refetchInterval: POLLING_INTERVAL,
+    enabled: !!driverId,
+  });
+}
 
 ```
 

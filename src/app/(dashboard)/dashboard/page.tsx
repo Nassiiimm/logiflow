@@ -1,6 +1,5 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import { Header } from "@/components/dashboard/header";
 import { StatsCard } from "@/components/dashboard/stats-card";
 import { Badge } from "@/components/ui/badge";
@@ -21,58 +20,14 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from "recharts";
-import { Package, Truck, CheckCircle, Clock, Users, User } from "lucide-react";
+import { Package, Truck, CheckCircle, Clock, Users, User, RefreshCw } from "lucide-react";
 import { getStatusColor, getStatusLabel } from "@/lib/utils";
-
-interface DashboardData {
-  stats: {
-    ordersToday: number;
-    ordersInTransit: number;
-    ordersDeliveredToday: number;
-    ordersPending: number;
-    totalVehicles: number;
-    vehiclesAvailable: number;
-    vehiclesMaintenance: number;
-    totalCustomers: number;
-    totalDrivers: number;
-  };
-  recentOrders: Array<{
-    id: string;
-    trackingNumber: string;
-    customer: string;
-    destination: string;
-    status: string;
-    date: string;
-  }>;
-  chartData: Array<{
-    name: string;
-    commandes: number;
-    livraisons: number;
-  }>;
-}
+import { useDashboardStats } from "@/hooks/use-queries";
 
 export default function DashboardPage() {
-  const [data, setData] = useState<DashboardData | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { data, isLoading, dataUpdatedAt } = useDashboardStats();
 
-  useEffect(() => {
-    async function fetchData() {
-      try {
-        const res = await fetch("/api/dashboard");
-        if (res.ok) {
-          const json = await res.json();
-          setData(json);
-        }
-      } catch (error) {
-        console.error("Failed to fetch dashboard data:", error);
-      } finally {
-        setLoading(false);
-      }
-    }
-    fetchData();
-  }, []);
-
-  if (loading) {
+  if (isLoading) {
     return (
       <div className="flex flex-col h-full">
         <Header title="Dashboard" />
@@ -100,6 +55,15 @@ export default function DashboardPage() {
       <Header title="Dashboard" />
 
       <div className="flex-1 p-6 space-y-6">
+        {/* Auto-refresh indicator */}
+        <div className="flex items-center justify-end gap-2 text-xs text-zinc-500">
+          <RefreshCw className="h-3 w-3" />
+          <span>
+            Actualise automatiquement toutes les 15s
+            {dataUpdatedAt && ` • Derniere MaJ: ${new Date(dataUpdatedAt).toLocaleTimeString()}`}
+          </span>
+        </div>
+
         {/* Stats Cards */}
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
           <StatsCard
@@ -238,7 +202,7 @@ export default function DashboardPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {(data?.recentOrders || []).map((order) => (
+                {(data?.recentOrders || []).map((order: any) => (
                   <TableRow key={order.id} className="border-zinc-800/50 hover:bg-zinc-800/30">
                     <TableCell className="font-medium text-zinc-200">{order.trackingNumber}</TableCell>
                     <TableCell className="text-zinc-300">{order.customer}</TableCell>

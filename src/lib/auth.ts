@@ -15,8 +15,16 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         password: { label: "Mot de passe", type: "password" },
       },
       async authorize(credentials) {
-        console.log("=== AUTHORIZE ===");
-        console.log("Raw credentials:", JSON.stringify(credentials));
+        console.log("=== AUTHORIZE START ===");
+        console.log("credentials type:", typeof credentials);
+        console.log("credentials keys:", credentials ? Object.keys(credentials) : "null");
+
+        // Log each key
+        if (credentials) {
+          for (const [key, value] of Object.entries(credentials)) {
+            console.log(`credentials.${key}:`, String(value).substring(0, 50));
+          }
+        }
 
         if (!credentials?.email || !credentials?.password) {
           console.log("Missing email or password");

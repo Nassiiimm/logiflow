@@ -74,7 +74,10 @@
 - src/components/ui/textarea.tsx
 - src/lib/auth.ts
 - src/lib/prisma.ts
+- src/lib/rate-limit.ts
 - src/lib/utils.ts
+- src/lib/validations.ts
+- src/middleware.ts
 - src/types/next-auth.d.ts
 
 ---
@@ -390,39 +393,55 @@ import { useState } from "react";
 import { signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Truck } from "lucide-react";
+import { Truck, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { loginSchema } from "@/lib/validations";
+import { toast } from "sonner";
 
 export default function LoginPage() {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [error, setError] = useState("");
+  const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
   const [isLoading, setIsLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setErrors({});
+
+    // Validate with Zod
+    const result = loginSchema.safeParse({ email, password });
+    if (!result.success) {
+      const fieldErrors: { email?: string; password?: string } = {};
+      result.error.errors.forEach((err) => {
+        if (err.path[0] === "email") fieldErrors.email = err.message;
+        if (err.path[0] === "password") fieldErrors.password = err.message;
+      });
+      setErrors(fieldErrors);
+      return;
+    }
+
     setIsLoading(true);
-    setError("");
 
     try {
-      const result = await signIn("credentials", {
+      const signInResult = await signIn("credentials", {
         email,
         password,
         redirect: false,
       });
 
-      if (result?.error) {
-        setError("Email ou mot de passe incorrect");
+      if (signInResult?.error) {
+        toast.error("Email ou mot de passe incorrect");
       } else {
+        toast.success("Connexion reussie");
         router.push("/dashboard");
         router.refresh();
       }
     } catch {
-      setError("Une erreur est survenue");
+      toast.error("Une erreur est survenue");
     } finally {
       setIsLoading(false);
     }
@@ -444,11 +463,6 @@ export default function LoginPage() {
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-4">
-          {error && (
-            <div className="p-3 text-sm text-red-400 bg-red-500/10 border border-red-500/20 rounded-lg">
-              {error}
-            </div>
-          )}
           <div className="space-y-2">
             <Label htmlFor="email">Email</Label>
             <Input
@@ -457,8 +471,11 @@ export default function LoginPage() {
               placeholder="admin@logiflow.com"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              required
+              className={errors.email ? "border-red-500" : ""}
             />
+            {errors.email && (
+              <p className="text-xs text-red-400">{errors.email}</p>
+            )}
           </div>
           <div className="space-y-2">
             <Label htmlFor="password">Mot de passe</Label>
@@ -468,11 +485,21 @@ export default function LoginPage() {
               placeholder="Votre mot de passe"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              required
+              className={errors.password ? "border-red-500" : ""}
             />
+            {errors.password && (
+              <p className="text-xs text-red-400">{errors.password}</p>
+            )}
           </div>
-          <Button type="submit" className="w-full" disabled={isLoading}>
-            {isLoading ? "Connexion..." : "Se connecter"}
+          <Button type="submit" className="w-full bg-cyan-600 hover:bg-cyan-700" disabled={isLoading}>
+            {isLoading ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Connexion...
+              </>
+            ) : (
+              "Se connecter"
+            )}
           </Button>
         </form>
         <div className="mt-4 text-center text-sm">
@@ -500,11 +527,20 @@ export default function LoginPage() {
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Truck } from "lucide-react";
+import { Truck, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { registerSchema } from "@/lib/validations";
+import { toast } from "sonner";
+
+type FormErrors = {
+  name?: string;
+  email?: string;
+  password?: string;
+  confirmPassword?: string;
+};
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -512,19 +548,26 @@ export default function RegisterPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  const [error, setError] = useState("");
+  const [errors, setErrors] = useState<FormErrors>({});
   const [isLoading, setIsLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsLoading(true);
-    setError("");
+    setErrors({});
 
-    if (password !== confirmPassword) {
-      setError("Les mots de passe ne correspondent pas");
-      setIsLoading(false);
+    // Validate with Zod
+    const result = registerSchema.safeParse({ name, email, password, confirmPassword });
+    if (!result.success) {
+      const fieldErrors: FormErrors = {};
+      result.error.errors.forEach((err) => {
+        const field = err.path[0] as keyof FormErrors;
+        fieldErrors[field] = err.message;
+      });
+      setErrors(fieldErrors);
       return;
     }
+
+    setIsLoading(true);
 
     try {
       const response = await fetch("/api/auth/register", {
@@ -538,9 +581,10 @@ export default function RegisterPage() {
         throw new Error(data.message || "Erreur lors de l'inscription");
       }
 
+      toast.success("Compte cree avec succes !");
       router.push("/login?registered=true");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Une erreur est survenue");
+      toast.error(err instanceof Error ? err.message : "Une erreur est survenue");
     } finally {
       setIsLoading(false);
     }
@@ -562,11 +606,6 @@ export default function RegisterPage() {
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-4">
-          {error && (
-            <div className="p-3 text-sm text-red-400 bg-red-500/10 border border-red-500/20 rounded-lg">
-              {error}
-            </div>
-          )}
           <div className="space-y-2">
             <Label htmlFor="name">Nom complet</Label>
             <Input
@@ -575,8 +614,11 @@ export default function RegisterPage() {
               placeholder="Jean Dupont"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              required
+              className={errors.name ? "border-red-500" : ""}
             />
+            {errors.name && (
+              <p className="text-xs text-red-400">{errors.name}</p>
+            )}
           </div>
           <div className="space-y-2">
             <Label htmlFor="email">Email</Label>
@@ -586,20 +628,25 @@ export default function RegisterPage() {
               placeholder="jean@exemple.com"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              required
+              className={errors.email ? "border-red-500" : ""}
             />
+            {errors.email && (
+              <p className="text-xs text-red-400">{errors.email}</p>
+            )}
           </div>
           <div className="space-y-2">
             <Label htmlFor="password">Mot de passe</Label>
             <Input
               id="password"
               type="password"
-              placeholder="Minimum 8 caracteres"
+              placeholder="Minimum 6 caracteres"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              required
-              minLength={8}
+              className={errors.password ? "border-red-500" : ""}
             />
+            {errors.password && (
+              <p className="text-xs text-red-400">{errors.password}</p>
+            )}
           </div>
           <div className="space-y-2">
             <Label htmlFor="confirmPassword">Confirmer le mot de passe</Label>
@@ -609,11 +656,21 @@ export default function RegisterPage() {
               placeholder="Confirmez votre mot de passe"
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
-              required
+              className={errors.confirmPassword ? "border-red-500" : ""}
             />
+            {errors.confirmPassword && (
+              <p className="text-xs text-red-400">{errors.confirmPassword}</p>
+            )}
           </div>
-          <Button type="submit" className="w-full" disabled={isLoading}>
-            {isLoading ? "Inscription..." : "S'inscrire"}
+          <Button type="submit" className="w-full bg-cyan-600 hover:bg-cyan-700" disabled={isLoading}>
+            {isLoading ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Inscription...
+              </>
+            ) : (
+              "S'inscrire"
+            )}
           </Button>
         </form>
         <div className="mt-4 text-center text-sm">
@@ -13364,6 +13421,99 @@ export default prisma;
 
 ```
 
+## src/lib/rate-limit.ts
+```tsx
+// Simple in-memory rate limiter
+// For production, use Redis-based solution like @upstash/ratelimit
+
+interface RateLimitEntry {
+  count: number;
+  resetTime: number;
+}
+
+const rateLimitMap = new Map<string, RateLimitEntry>();
+
+// Clean up old entries every 5 minutes
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, entry] of rateLimitMap.entries()) {
+    if (entry.resetTime < now) {
+      rateLimitMap.delete(key);
+    }
+  }
+}, 5 * 60 * 1000);
+
+export interface RateLimitConfig {
+  maxRequests: number;  // Max requests allowed
+  windowMs: number;     // Time window in milliseconds
+}
+
+export interface RateLimitResult {
+  success: boolean;
+  remaining: number;
+  resetIn: number;  // Seconds until reset
+}
+
+export function rateLimit(
+  identifier: string,
+  config: RateLimitConfig = { maxRequests: 5, windowMs: 60 * 1000 }
+): RateLimitResult {
+  const now = Date.now();
+  const key = identifier;
+
+  let entry = rateLimitMap.get(key);
+
+  // If no entry or window expired, create new entry
+  if (!entry || entry.resetTime < now) {
+    entry = {
+      count: 1,
+      resetTime: now + config.windowMs,
+    };
+    rateLimitMap.set(key, entry);
+
+    return {
+      success: true,
+      remaining: config.maxRequests - 1,
+      resetIn: Math.ceil(config.windowMs / 1000),
+    };
+  }
+
+  // Increment count
+  entry.count++;
+
+  // Check if over limit
+  if (entry.count > config.maxRequests) {
+    return {
+      success: false,
+      remaining: 0,
+      resetIn: Math.ceil((entry.resetTime - now) / 1000),
+    };
+  }
+
+  return {
+    success: true,
+    remaining: config.maxRequests - entry.count,
+    resetIn: Math.ceil((entry.resetTime - now) / 1000),
+  };
+}
+
+// Helper to get client IP from request
+export function getClientIp(request: Request): string {
+  const forwardedFor = request.headers.get("x-forwarded-for");
+  if (forwardedFor) {
+    return forwardedFor.split(",")[0].trim();
+  }
+
+  const realIp = request.headers.get("x-real-ip");
+  if (realIp) {
+    return realIp;
+  }
+
+  return "unknown";
+}
+
+```
+
 ## src/lib/utils.ts
 ```tsx
 import { clsx, type ClassValue } from "clsx"
@@ -13452,6 +13602,331 @@ export function getStatusLabel(status: string): string {
   };
   return labels[status] || status;
 }
+
+```
+
+## src/lib/validations.ts
+```tsx
+import { z } from "zod";
+
+// Auth schemas
+export const loginSchema = z.object({
+  email: z
+    .string()
+    .min(1, "L'email est requis")
+    .email("Email invalide"),
+  password: z
+    .string()
+    .min(1, "Le mot de passe est requis")
+    .min(6, "Le mot de passe doit contenir au moins 6 caractères"),
+});
+
+export const registerSchema = z.object({
+  name: z
+    .string()
+    .min(1, "Le nom est requis")
+    .min(2, "Le nom doit contenir au moins 2 caractères"),
+  email: z
+    .string()
+    .min(1, "L'email est requis")
+    .email("Email invalide"),
+  password: z
+    .string()
+    .min(1, "Le mot de passe est requis")
+    .min(6, "Le mot de passe doit contenir au moins 6 caractères"),
+  confirmPassword: z
+    .string()
+    .min(1, "Confirmez le mot de passe"),
+}).refine((data) => data.password === data.confirmPassword, {
+  message: "Les mots de passe ne correspondent pas",
+  path: ["confirmPassword"],
+});
+
+// Route schemas
+export const createRouteSchema = z.object({
+  name: z.string().optional(),
+  scheduledDate: z
+    .string()
+    .min(1, "La date est requise"),
+  contractId: z.string().optional(),
+  driverId: z.string().optional(),
+  vehicleId: z.string().optional(),
+  notes: z.string().optional(),
+});
+
+export const createRouteFromPackagesSchema = z.object({
+  scheduledDate: z
+    .string()
+    .min(1, "La date est requise"),
+  contractId: z.string().optional(),
+  driverId: z.string().optional(),
+  vehicleId: z.string().optional(),
+  routeName: z.string().optional(),
+});
+
+// Package/Stop schemas
+export const packageSchema = z.object({
+  externalBarcode: z.string().optional(),
+  recipientName: z.string().optional(),
+  address: z
+    .string()
+    .min(1, "L'adresse est requise"),
+  city: z
+    .string()
+    .min(1, "La ville est requise"),
+  postalCode: z
+    .string()
+    .min(1, "Le code postal est requis"),
+  phone: z.string().optional(),
+  instructions: z.string().optional(),
+  accessCode: z.string().optional(),
+  weight: z.string().optional(),
+});
+
+export const updateStopSchema = z.object({
+  status: z.enum(["PENDING", "IN_PROGRESS", "ARRIVED", "COMPLETED", "FAILED", "SKIPPED"]),
+  signature: z.string().optional(),
+  signedBy: z.string().optional(),
+  proofPhoto: z.string().optional(),
+  deliveryNotes: z.string().optional(),
+  failureReason: z.string().optional(),
+});
+
+// Contract schema
+export const contractSchema = z.object({
+  name: z
+    .string()
+    .min(1, "Le nom est requis"),
+  code: z
+    .string()
+    .min(1, "Le code est requis")
+    .max(10, "Le code ne peut pas dépasser 10 caractères"),
+  type: z.enum(["SUBCONTRACTOR", "DIRECT"]),
+  contactName: z.string().optional(),
+  contactEmail: z
+    .string()
+    .email("Email invalide")
+    .optional()
+    .or(z.literal("")),
+  contactPhone: z.string().optional(),
+  address: z.string().optional(),
+  city: z.string().optional(),
+  postalCode: z.string().optional(),
+  ratePerStop: z
+    .number()
+    .positive("Le tarif doit être positif")
+    .optional()
+    .or(z.literal(0)),
+  ratePerPackage: z
+    .number()
+    .positive("Le tarif doit être positif")
+    .optional()
+    .or(z.literal(0)),
+  ratePerKm: z
+    .number()
+    .positive("Le tarif doit être positif")
+    .optional()
+    .or(z.literal(0)),
+  notes: z.string().optional(),
+});
+
+// Customer schema
+export const customerSchema = z.object({
+  name: z
+    .string()
+    .min(1, "Le nom est requis"),
+  email: z
+    .string()
+    .min(1, "L'email est requis")
+    .email("Email invalide"),
+  phone: z.string().optional(),
+  company: z.string().optional(),
+  address: z
+    .string()
+    .min(1, "L'adresse est requise"),
+  city: z
+    .string()
+    .min(1, "La ville est requise"),
+  postalCode: z
+    .string()
+    .min(1, "Le code postal est requis"),
+  notes: z.string().optional(),
+});
+
+// Driver schema
+export const driverSchema = z.object({
+  name: z
+    .string()
+    .min(1, "Le nom est requis"),
+  email: z
+    .string()
+    .min(1, "L'email est requis")
+    .email("Email invalide"),
+  phone: z
+    .string()
+    .min(1, "Le téléphone est requis"),
+  licenseNumber: z
+    .string()
+    .min(1, "Le numéro de permis est requis"),
+  licenseExpiry: z
+    .string()
+    .min(1, "La date d'expiration est requise"),
+});
+
+// Vehicle schema
+export const vehicleSchema = z.object({
+  plateNumber: z
+    .string()
+    .min(1, "Le numéro de plaque est requis"),
+  type: z.enum(["VAN", "TRUCK", "MOTORCYCLE", "BICYCLE", "CAR"]),
+  brand: z
+    .string()
+    .min(1, "La marque est requise"),
+  model: z
+    .string()
+    .min(1, "Le modèle est requis"),
+  year: z.number().optional(),
+  capacity: z.number().optional(),
+  volume: z.number().optional(),
+  fuelType: z.string().optional(),
+});
+
+// Type exports
+export type LoginInput = z.infer<typeof loginSchema>;
+export type RegisterInput = z.infer<typeof registerSchema>;
+export type CreateRouteInput = z.infer<typeof createRouteSchema>;
+export type PackageInput = z.infer<typeof packageSchema>;
+export type ContractInput = z.infer<typeof contractSchema>;
+export type CustomerInput = z.infer<typeof customerSchema>;
+export type DriverInput = z.infer<typeof driverSchema>;
+export type VehicleInput = z.infer<typeof vehicleSchema>;
+
+```
+
+## src/middleware.ts
+```tsx
+import { NextResponse } from "next/server";
+import type { NextRequest } from "next/server";
+import { auth } from "@/lib/auth";
+
+// Simple in-memory rate limit store (resets on server restart)
+const loginAttempts = new Map<string, { count: number; resetTime: number }>();
+
+function getClientIp(request: NextRequest): string {
+  const forwardedFor = request.headers.get("x-forwarded-for");
+  if (forwardedFor) {
+    return forwardedFor.split(",")[0].trim();
+  }
+  const realIp = request.headers.get("x-real-ip");
+  if (realIp) {
+    return realIp;
+  }
+  return "127.0.0.1";
+}
+
+function checkRateLimit(ip: string): { allowed: boolean; remaining: number; resetIn: number } {
+  const now = Date.now();
+  const windowMs = 60 * 1000; // 1 minute
+  const maxAttempts = 5;
+
+  let entry = loginAttempts.get(ip);
+
+  if (!entry || entry.resetTime < now) {
+    entry = { count: 1, resetTime: now + windowMs };
+    loginAttempts.set(ip, entry);
+    return { allowed: true, remaining: maxAttempts - 1, resetIn: 60 };
+  }
+
+  entry.count++;
+
+  if (entry.count > maxAttempts) {
+    return {
+      allowed: false,
+      remaining: 0,
+      resetIn: Math.ceil((entry.resetTime - now) / 1000),
+    };
+  }
+
+  return {
+    allowed: true,
+    remaining: maxAttempts - entry.count,
+    resetIn: Math.ceil((entry.resetTime - now) / 1000),
+  };
+}
+
+export async function middleware(request: NextRequest) {
+  const path = request.nextUrl.pathname;
+
+  // Rate limit login attempts
+  if (path === "/api/auth/callback/credentials" && request.method === "POST") {
+    const ip = getClientIp(request);
+    const { allowed, remaining, resetIn } = checkRateLimit(ip);
+
+    if (!allowed) {
+      return NextResponse.json(
+        {
+          error: "Trop de tentatives de connexion",
+          message: `Reessayez dans ${resetIn} secondes`,
+        },
+        {
+          status: 429,
+          headers: {
+            "X-RateLimit-Remaining": "0",
+            "X-RateLimit-Reset": String(resetIn),
+            "Retry-After": String(resetIn),
+          },
+        }
+      );
+    }
+  }
+
+  // Protect dashboard routes
+  if (path.startsWith("/dashboard") || path.startsWith("/orders") ||
+      path.startsWith("/routes") || path.startsWith("/packages") ||
+      path.startsWith("/customers") || path.startsWith("/contracts") ||
+      path.startsWith("/fleet") || path.startsWith("/warehouses") ||
+      path.startsWith("/invoices") || path.startsWith("/settings")) {
+
+    const session = await auth();
+
+    if (!session) {
+      return NextResponse.redirect(new URL("/login", request.url));
+    }
+  }
+
+  // Protect driver routes
+  if (path.startsWith("/driver")) {
+    const session = await auth();
+
+    if (!session) {
+      return NextResponse.redirect(new URL("/login", request.url));
+    }
+
+    // Check if user is a driver
+    if (session.user.role !== "DRIVER" && session.user.role !== "ADMIN") {
+      return NextResponse.redirect(new URL("/dashboard", request.url));
+    }
+  }
+
+  return NextResponse.next();
+}
+
+export const config = {
+  matcher: [
+    "/dashboard/:path*",
+    "/orders/:path*",
+    "/routes/:path*",
+    "/packages/:path*",
+    "/customers/:path*",
+    "/contracts/:path*",
+    "/fleet/:path*",
+    "/warehouses/:path*",
+    "/invoices/:path*",
+    "/settings/:path*",
+    "/driver/:path*",
+    "/api/auth/callback/credentials",
+  ],
+};
 
 ```
 

@@ -1,36 +1,177 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# LogiFlow
 
-## Getting Started
+[![Next.js](https://img.shields.io/badge/Next.js-14-black?logo=next.js)](https://nextjs.org/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5-blue?logo=typescript)](https://www.typescriptlang.org/)
+[![Prisma](https://img.shields.io/badge/Prisma-5-2D3748?logo=prisma)](https://www.prisma.io/)
+[![Tailwind CSS](https://img.shields.io/badge/Tailwind-3-38B2AC?logo=tailwind-css)](https://tailwindcss.com/)
 
-First, run the development server:
+SaaS de gestion logistique pour les entreprises de livraison last-mile. Gerez vos colis, routes, chauffeurs et factures en un seul endroit.
 
+## Fonctionnalites
+
+### Gestion des Colis
+- Import CSV de colis (compatible Amazon, Purolator, etc.)
+- Creation automatique de routes depuis les colis
+- Groupement intelligent par adresse
+- Suivi des statuts en temps reel
+
+### Gestion des Routes
+- Creation et planification de tournees
+- Affectation chauffeurs/vehicules
+- Suivi de progression
+- Import CSV avec stops
+
+### Interface Chauffeur
+- Vue mobile optimisee
+- Navigation stop par stop
+- Capture signature electronique
+- Photo preuve de livraison
+- Mise a jour statuts en temps reel
+
+### Dashboard
+- KPIs en temps reel
+- Statistiques de livraison
+- Suivi des performances
+
+### Autres Modules
+- Gestion des contrats (sous-traitance)
+- Gestion clients
+- Gestion de flotte (vehicules + maintenance)
+- Facturation
+- Tracking public
+
+## Stack Technique
+
+- **Frontend**: Next.js 14 (App Router), React 18, TypeScript
+- **Styling**: Tailwind CSS, shadcn/ui
+- **Backend**: Next.js API Routes
+- **Database**: PostgreSQL + Prisma ORM
+- **Auth**: NextAuth.js (credentials)
+- **Validation**: Zod
+
+## Installation
+
+### Prerequis
+
+- Node.js 18+
+- PostgreSQL 14+
+- npm ou yarn
+
+### Setup
+
+1. **Cloner le repo**
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+git clone https://github.com/Nassiiimm/logiflow.git
+cd logiflow
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+2. **Installer les dependances**
+```bash
+npm install
+```
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+3. **Configurer les variables d'environnement**
+```bash
+cp .env.example .env
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Editer `.env`:
+```env
+DATABASE_URL="postgresql://user:password@localhost:5432/logiflow"
+AUTH_SECRET="votre-secret-genere-aleatoirement"
+NEXTAUTH_URL="http://localhost:3000"
+```
 
-## Learn More
+4. **Initialiser la base de donnees**
+```bash
+npx prisma generate
+npx prisma db push
+npx prisma db seed
+```
 
-To learn more about Next.js, take a look at the following resources:
+5. **Lancer le serveur de developpement**
+```bash
+npm run dev
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Ouvrir [http://localhost:3000](http://localhost:3000)
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+### Comptes de demo
 
-## Deploy on Vercel
+| Role | Email | Mot de passe |
+|------|-------|--------------|
+| Admin | admin@logiflow.com | password123 |
+| Dispatcher | dispatcher@logiflow.com | password123 |
+| Chauffeur | driver@logiflow.com | password123 |
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Structure du Projet
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+```
+logiflow/
+├── prisma/
+│   ├── schema.prisma      # Schema base de donnees
+│   └── seed.ts            # Donnees initiales
+├── src/
+│   ├── app/
+│   │   ├── (auth)/        # Pages login/register
+│   │   ├── (dashboard)/   # Pages admin
+│   │   ├── (driver)/      # Interface chauffeur
+│   │   ├── api/           # API Routes
+│   │   └── tracking/      # Page tracking public
+│   ├── components/
+│   │   ├── dashboard/     # Composants dashboard
+│   │   └── ui/            # Composants shadcn/ui
+│   └── lib/
+│       ├── auth.ts        # Config NextAuth
+│       ├── prisma.ts      # Client Prisma
+│       ├── validations.ts # Schemas Zod
+│       └── utils.ts       # Utilitaires
+└── public/
+    └── exemple-colis.csv  # Fichier CSV exemple
+```
+
+## API Endpoints
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET/POST | `/api/routes` | Gestion des routes |
+| POST | `/api/packages/create-route` | Creer route depuis colis |
+| GET/POST | `/api/drivers` | Gestion chauffeurs |
+| GET/POST | `/api/contracts` | Gestion contrats |
+| GET/POST | `/api/customers` | Gestion clients |
+| GET/POST | `/api/vehicles` | Gestion vehicules |
+| GET | `/api/dashboard` | Stats dashboard |
+| GET | `/api/tracking` | Suivi public |
+
+## Deploiement
+
+### Vercel (recommande)
+
+```bash
+npm install -g vercel
+vercel
+```
+
+### Docker
+
+```bash
+docker build -t logiflow .
+docker run -p 3000:3000 logiflow
+```
+
+## Roadmap
+
+- [ ] Notifications push
+- [ ] Optimisation d'itineraires (algo)
+- [ ] Export PDF factures
+- [ ] Integration maps (Leaflet)
+- [ ] Mode offline chauffeur
+- [ ] API publique
+
+## Licence
+
+MIT
+
+---
+
+Developpe avec Claude Code

@@ -4,39 +4,55 @@ import { useState } from "react";
 import { signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Truck } from "lucide-react";
+import { Truck, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { loginSchema } from "@/lib/validations";
+import { toast } from "sonner";
 
 export default function LoginPage() {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [error, setError] = useState("");
+  const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
   const [isLoading, setIsLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setErrors({});
+
+    // Validate with Zod
+    const result = loginSchema.safeParse({ email, password });
+    if (!result.success) {
+      const fieldErrors: { email?: string; password?: string } = {};
+      result.error.errors.forEach((err) => {
+        if (err.path[0] === "email") fieldErrors.email = err.message;
+        if (err.path[0] === "password") fieldErrors.password = err.message;
+      });
+      setErrors(fieldErrors);
+      return;
+    }
+
     setIsLoading(true);
-    setError("");
 
     try {
-      const result = await signIn("credentials", {
+      const signInResult = await signIn("credentials", {
         email,
         password,
         redirect: false,
       });
 
-      if (result?.error) {
-        setError("Email ou mot de passe incorrect");
+      if (signInResult?.error) {
+        toast.error("Email ou mot de passe incorrect");
       } else {
+        toast.success("Connexion reussie");
         router.push("/dashboard");
         router.refresh();
       }
     } catch {
-      setError("Une erreur est survenue");
+      toast.error("Une erreur est survenue");
     } finally {
       setIsLoading(false);
     }
@@ -58,11 +74,6 @@ export default function LoginPage() {
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-4">
-          {error && (
-            <div className="p-3 text-sm text-red-400 bg-red-500/10 border border-red-500/20 rounded-lg">
-              {error}
-            </div>
-          )}
           <div className="space-y-2">
             <Label htmlFor="email">Email</Label>
             <Input
@@ -71,8 +82,11 @@ export default function LoginPage() {
               placeholder="admin@logiflow.com"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              required
+              className={errors.email ? "border-red-500" : ""}
             />
+            {errors.email && (
+              <p className="text-xs text-red-400">{errors.email}</p>
+            )}
           </div>
           <div className="space-y-2">
             <Label htmlFor="password">Mot de passe</Label>
@@ -82,11 +96,21 @@ export default function LoginPage() {
               placeholder="Votre mot de passe"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              required
+              className={errors.password ? "border-red-500" : ""}
             />
+            {errors.password && (
+              <p className="text-xs text-red-400">{errors.password}</p>
+            )}
           </div>
-          <Button type="submit" className="w-full" disabled={isLoading}>
-            {isLoading ? "Connexion..." : "Se connecter"}
+          <Button type="submit" className="w-full bg-cyan-600 hover:bg-cyan-700" disabled={isLoading}>
+            {isLoading ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Connexion...
+              </>
+            ) : (
+              "Se connecter"
+            )}
           </Button>
         </form>
         <div className="mt-4 text-center text-sm">

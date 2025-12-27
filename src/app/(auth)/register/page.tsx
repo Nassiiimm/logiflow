@@ -3,11 +3,20 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Truck } from "lucide-react";
+import { Truck, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { registerSchema } from "@/lib/validations";
+import { toast } from "sonner";
+
+type FormErrors = {
+  name?: string;
+  email?: string;
+  password?: string;
+  confirmPassword?: string;
+};
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -15,19 +24,26 @@ export default function RegisterPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  const [error, setError] = useState("");
+  const [errors, setErrors] = useState<FormErrors>({});
   const [isLoading, setIsLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsLoading(true);
-    setError("");
+    setErrors({});
 
-    if (password !== confirmPassword) {
-      setError("Les mots de passe ne correspondent pas");
-      setIsLoading(false);
+    // Validate with Zod
+    const result = registerSchema.safeParse({ name, email, password, confirmPassword });
+    if (!result.success) {
+      const fieldErrors: FormErrors = {};
+      result.error.errors.forEach((err) => {
+        const field = err.path[0] as keyof FormErrors;
+        fieldErrors[field] = err.message;
+      });
+      setErrors(fieldErrors);
       return;
     }
+
+    setIsLoading(true);
 
     try {
       const response = await fetch("/api/auth/register", {
@@ -41,9 +57,10 @@ export default function RegisterPage() {
         throw new Error(data.message || "Erreur lors de l'inscription");
       }
 
+      toast.success("Compte cree avec succes !");
       router.push("/login?registered=true");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Une erreur est survenue");
+      toast.error(err instanceof Error ? err.message : "Une erreur est survenue");
     } finally {
       setIsLoading(false);
     }
@@ -65,11 +82,6 @@ export default function RegisterPage() {
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-4">
-          {error && (
-            <div className="p-3 text-sm text-red-400 bg-red-500/10 border border-red-500/20 rounded-lg">
-              {error}
-            </div>
-          )}
           <div className="space-y-2">
             <Label htmlFor="name">Nom complet</Label>
             <Input
@@ -78,8 +90,11 @@ export default function RegisterPage() {
               placeholder="Jean Dupont"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              required
+              className={errors.name ? "border-red-500" : ""}
             />
+            {errors.name && (
+              <p className="text-xs text-red-400">{errors.name}</p>
+            )}
           </div>
           <div className="space-y-2">
             <Label htmlFor="email">Email</Label>
@@ -89,20 +104,25 @@ export default function RegisterPage() {
               placeholder="jean@exemple.com"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              required
+              className={errors.email ? "border-red-500" : ""}
             />
+            {errors.email && (
+              <p className="text-xs text-red-400">{errors.email}</p>
+            )}
           </div>
           <div className="space-y-2">
             <Label htmlFor="password">Mot de passe</Label>
             <Input
               id="password"
               type="password"
-              placeholder="Minimum 8 caracteres"
+              placeholder="Minimum 6 caracteres"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              required
-              minLength={8}
+              className={errors.password ? "border-red-500" : ""}
             />
+            {errors.password && (
+              <p className="text-xs text-red-400">{errors.password}</p>
+            )}
           </div>
           <div className="space-y-2">
             <Label htmlFor="confirmPassword">Confirmer le mot de passe</Label>
@@ -112,11 +132,21 @@ export default function RegisterPage() {
               placeholder="Confirmez votre mot de passe"
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
-              required
+              className={errors.confirmPassword ? "border-red-500" : ""}
             />
+            {errors.confirmPassword && (
+              <p className="text-xs text-red-400">{errors.confirmPassword}</p>
+            )}
           </div>
-          <Button type="submit" className="w-full" disabled={isLoading}>
-            {isLoading ? "Inscription..." : "S'inscrire"}
+          <Button type="submit" className="w-full bg-cyan-600 hover:bg-cyan-700" disabled={isLoading}>
+            {isLoading ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Inscription...
+              </>
+            ) : (
+              "S'inscrire"
+            )}
           </Button>
         </form>
         <div className="mt-4 text-center text-sm">

@@ -40,16 +40,14 @@ export default function LoginPage() {
     try {
       const result = await loginAction(email, password);
 
-      if (result.success) {
-        toast.success("Connexion reussie");
-        router.push("/dashboard");
-        router.refresh();
-      } else {
+      // If we get here without a redirect, it means login failed
+      if (result && !result.success) {
         toast.error(result.error || "Email ou mot de passe incorrect");
+        setIsLoading(false);
       }
+      // On success, the server action redirects automatically
     } catch {
-      toast.error("Une erreur est survenue");
-    } finally {
+      // Redirect errors are normal on success
       setIsLoading(false);
     }
   };

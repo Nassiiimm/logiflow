@@ -1,8 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { signIn } from "next-auth/react";
-import { useRouter } from "next/navigation";
+import { useState, useEffect } from "react";
+import { signIn, getCsrfToken } from "next-auth/react";
 import Link from "next/link";
 import { Truck, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -13,11 +12,17 @@ import { loginSchema } from "@/lib/validations";
 import { toast } from "sonner";
 
 export default function LoginPage() {
-  const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
   const [isLoading, setIsLoading] = useState(false);
+  const [csrfToken, setCsrfToken] = useState<string>("");
+
+  useEffect(() => {
+    getCsrfToken().then((token) => {
+      if (token) setCsrfToken(token);
+    });
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -44,15 +49,20 @@ export default function LoginPage() {
         redirect: false,
       });
 
+      console.log("SignIn result:", JSON.stringify(result));
+
       if (result?.error) {
         toast.error("Email ou mot de passe incorrect");
-      } else if (result?.ok) {
-        toast.success("Connexion reussie");
-        window.location.href = "/dashboard";
+        setIsLoading(false);
+      } else {
+        toast.success("Connexion reussie !");
+        setTimeout(() => {
+          window.location.href = "/dashboard";
+        }, 500);
       }
-    } catch {
+    } catch (err) {
+      console.error("SignIn error:", err);
       toast.error("Une erreur est survenue");
-    } finally {
       setIsLoading(false);
     }
   };
@@ -73,12 +83,14 @@ export default function LoginPage() {
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-4">
+          <input type="hidden" name="csrfToken" value={csrfToken} />
           <div className="space-y-2">
             <Label htmlFor="email">Email</Label>
             <Input
               id="email"
+              name="email"
               type="email"
-              placeholder="admin@logiflow.com"
+              placeholder="admin@logiflow.fr"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               className={errors.email ? "border-red-500" : ""}
@@ -91,6 +103,7 @@ export default function LoginPage() {
             <Label htmlFor="password">Mot de passe</Label>
             <Input
               id="password"
+              name="password"
               type="password"
               placeholder="Votre mot de passe"
               value={password}

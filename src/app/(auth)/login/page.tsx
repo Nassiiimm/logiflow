@@ -14,11 +14,16 @@ export default function LoginPage() {
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    console.log("=== LOGIN SUBMIT START ===");
+    alert("Login clicked!"); // Force visible feedback
     setIsLoading(true);
 
     const formData = new FormData(e.currentTarget);
     const email = formData.get("email") as string;
     const password = formData.get("password") as string;
+
+    console.log("Email:", email);
+    console.log("Password length:", password?.length);
 
     if (!email || !password) {
       toast.error("Veuillez remplir tous les champs");
@@ -27,9 +32,13 @@ export default function LoginPage() {
     }
 
     try {
+      console.log("Fetching CSRF token...");
       // Get CSRF token first
       const csrfRes = await fetch("/api/auth/csrf");
-      const { csrfToken } = await csrfRes.json();
+      console.log("CSRF response status:", csrfRes.status);
+      const csrfData = await csrfRes.json();
+      console.log("CSRF data:", csrfData);
+      const csrfToken = csrfData.csrfToken;
 
       // Submit to NextAuth callback
       const res = await fetch("/api/auth/callback/credentials", {

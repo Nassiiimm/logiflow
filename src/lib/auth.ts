@@ -13,33 +13,48 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         password: { label: "Mot de passe", type: "password" },
       },
       async authorize(credentials) {
+        console.log("[auth] authorize called with email:", credentials?.email);
+
         if (!credentials?.email || !credentials?.password) {
+          console.log("[auth] Missing credentials");
           return null;
         }
 
-        const user = await prisma.user.findUnique({
-          where: { email: credentials.email as string },
-        });
+        try {
+          const user = await prisma.user.findUnique({
+            where: { email: credentials.email as string },
+          });
 
-        if (!user || !user.password) {
+          console.log("[auth] User found:", user ? "yes" : "no", user?.email);
+
+          if (!user || !user.password) {
+            console.log("[auth] User not found or no password");
+            return null;
+          }
+
+          const isPasswordValid = await bcrypt.compare(
+            credentials.password as string,
+            user.password
+          );
+
+          console.log("[auth] Password valid:", isPasswordValid);
+
+          if (!isPasswordValid) {
+            console.log("[auth] Invalid password");
+            return null;
+          }
+
+          console.log("[auth] Login successful for:", user.email);
+          return {
+            id: user.id,
+            email: user.email,
+            name: user.name,
+            role: user.role,
+          };
+        } catch (error) {
+          console.error("[auth] Error in authorize:", error);
           return null;
         }
-
-        const isPasswordValid = await bcrypt.compare(
-          credentials.password as string,
-          user.password
-        );
-
-        if (!isPasswordValid) {
-          return null;
-        }
-
-        return {
-          id: user.id,
-          email: user.email,
-          name: user.name,
-          role: user.role,
-        };
       },
     }),
   ],

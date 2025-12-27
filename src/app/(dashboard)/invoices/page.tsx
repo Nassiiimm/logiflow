@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import dynamic from "next/dynamic";
 import { Header } from "@/components/dashboard/header";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -32,6 +33,7 @@ import { Label } from "@/components/ui/label";
 import { Plus, Search, Eye, Download, Send, FileText, Euro, Loader2 } from "lucide-react";
 import { getStatusColor, getStatusLabel, formatDate, formatCurrency } from "@/lib/utils";
 import { toast } from "sonner";
+import { InvoicePDF, type InvoiceData } from "@/components/pdf/invoice-pdf";
 
 interface Invoice {
   id: string;
@@ -70,6 +72,7 @@ export default function InvoicesPage() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedOrders, setSelectedOrders] = useState<string[]>([]);
+  const [downloadingId, setDownloadingId] = useState<string | null>(null);
 
   const [formData, setFormData] = useState({
     customerId: "",
@@ -77,6 +80,39 @@ export default function InvoicesPage() {
     taxRate: "20",
     notes: "",
   });
+
+  async function handleDownloadPDF(invoiceId: string, invoiceNumber: string) {
+    setDownloadingId(invoiceId);
+    try {
+      // Fetch invoice details
+      const res = await fetch(`/api/invoices/${invoiceId}`);
+      if (!res.ok) throw new Error("Failed to fetch invoice");
+      const invoiceData: InvoiceData = await res.json();
+
+      // Dynamic import to avoid SSR issues
+      const { pdf } = await import("@react-pdf/renderer");
+
+      // Generate PDF blob
+      const blob = await pdf(<InvoicePDF invoice={invoiceData} />).toBlob();
+
+      // Create download link
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `${invoiceNumber}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+
+      toast.success("Facture telechargee");
+    } catch (error) {
+      console.error("PDF download error:", error);
+      toast.error("Erreur lors du telechargement");
+    } finally {
+      setDownloadingId(null);
+    }
+  }
 
   useEffect(() => {
     fetchData();
@@ -433,8 +469,19 @@ export default function InvoicesPage() {
                         <Button variant="ghost" size="icon" title="Voir" className="text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/50">
                           <Eye className="h-4 w-4" />
                         </Button>
-                        <Button variant="ghost" size="icon" title="Telecharger PDF" className="text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/50">
-                          <Download className="h-4 w-4" />
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          title="Telecharger PDF"
+                          className="text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/50"
+                          onClick={() => handleDownloadPDF(invoice.id, invoice.invoiceNumber)}
+                          disabled={downloadingId === invoice.id}
+                        >
+                          {downloadingId === invoice.id ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <Download className="h-4 w-4" />
+                          )}
                         </Button>
                         {invoice.status === "DRAFT" && (
                           <Button variant="ghost" size="icon" title="Envoyer" className="text-cyan-400 hover:text-cyan-300 hover:bg-cyan-500/10">

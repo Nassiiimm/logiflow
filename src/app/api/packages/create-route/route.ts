@@ -12,6 +12,8 @@ interface PackageWithAddress {
   phone: string | null;
   instructions: string | null;
   accessCode: string | null;
+  description?: string;
+  weight?: string;
 }
 
 export async function POST(request: NextRequest) {

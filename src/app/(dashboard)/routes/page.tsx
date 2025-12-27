@@ -89,7 +89,7 @@ interface Contract {
 
 interface Driver {
   id: string;
-  user: { name: string };
+  name: string;
 }
 
 interface Vehicle {

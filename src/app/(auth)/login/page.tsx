@@ -82,7 +82,7 @@ export default function LoginPage() {
         </div>
         <div className="mt-6 p-4 bg-zinc-900/50 border border-zinc-800 rounded-lg">
           <p className="text-xs text-zinc-500 text-center">
-            Demo: admin@logiflow.fr / Admin123!
+            Demo: admin@logiflow.fr / admin123
           </p>
         </div>
       </CardContent>

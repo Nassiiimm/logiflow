@@ -5,7 +5,8 @@ import bcrypt from "bcryptjs";
 // TEMPORARY - DELETE AFTER USE
 export async function GET() {
   try {
-    const hashedPassword = await bcrypt.hash("Admin123!", 12);
+    // Simple password without special characters
+    const hashedPassword = await bcrypt.hash("admin123", 12);
 
     const user = await prisma.user.upsert({
       where: { email: "admin@logiflow.fr" },

@@ -1,0 +1,543 @@
+// Prisma Schema pour LogiFlow - SaaS de Gestion Logistique
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ======================= UTILISATEURS =======================
+
+enum UserRole {
+  ADMIN
+  MANAGER
+  DISPATCHER
+  DRIVER
+}
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  name          String
+  password      String
+  role          UserRole  @default(DISPATCHER)
+  phone         String?
+  avatar        String?
+  isActive      Boolean   @default(true)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // Relations
+  driver        Driver?
+  orders        Order[]   @relation("OrderCreator")
+  invoices      Invoice[]
+  routes        Route[]   @relation("RouteCreator")
+}
+
+// ======================= CONTRATS SOUS-TRAITANCE =======================
+
+enum ContractType {
+  SUBCONTRACTOR   // Sous-traitance (Amazon, Purolator, etc.)
+  DIRECT          // Client direct
+}
+
+model Contract {
+  id            String       @id @default(cuid())
+  name          String       // Ex: "Amazon Logistics", "Purolator"
+  type          ContractType @default(SUBCONTRACTOR)
+  code          String       @unique // Ex: "AMZN", "PURO", "KWIK"
+  contactName   String?
+  contactEmail  String?
+  contactPhone  String?
+  address       String?
+  city          String?
+  postalCode    String?
+  notes         String?
+
+  // Tarification
+  ratePerStop   Float?       // Tarif par stop
+  ratePerPackage Float?      // Tarif par colis
+  ratePerKm     Float?       // Tarif au km
+
+  isActive      Boolean      @default(true)
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+
+  // Relations
+  routes        Route[]
+  packages      Package[]
+}
+
+// ======================= CLIENTS =======================
+
+model Customer {
+  id            String    @id @default(cuid())
+  name          String
+  email         String    @unique
+  phone         String?
+  company       String?
+  address       String
+  city          String
+  postalCode    String
+  country       String    @default("France")
+  notes         String?
+  isActive      Boolean   @default(true)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // Relations
+  orders        Order[]
+  invoices      Invoice[]
+}
+
+// ======================= ROUTES & TOURNEES =======================
+
+enum RouteStatus {
+  DRAFT         // Brouillon
+  PLANNED       // Planifiee
+  IN_PROGRESS   // En cours
+  COMPLETED     // Terminee
+  CANCELLED     // Annulee
+}
+
+model Route {
+  id              String      @id @default(cuid())
+  routeNumber     String      @unique
+  name            String?     // Ex: "Route Montreal Nord - 15 Dec"
+  status          RouteStatus @default(DRAFT)
+  scheduledDate   DateTime    // Date prevue
+  startTime       DateTime?   // Heure de depart reelle
+  endTime         DateTime?   // Heure de fin reelle
+
+  // Statistiques
+  totalStops      Int         @default(0)
+  completedStops  Int         @default(0)
+  totalPackages   Int         @default(0)
+  deliveredPackages Int       @default(0)
+  totalDistance   Float?      // en km
+
+  notes           String?
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  // Relations
+  contractId      String?
+  contract        Contract?   @relation(fields: [contractId], references: [id])
+
+  driverId        String?
+  driver          Driver?     @relation(fields: [driverId], references: [id])
+
+  vehicleId       String?
+  vehicle         Vehicle?    @relation(fields: [vehicleId], references: [id])
+
+  createdById     String
+  createdBy       User        @relation("RouteCreator", fields: [createdById], references: [id])
+
+  stops           RouteStop[]
+}
+
+enum StopStatus {
+  PENDING       // En attente
+  IN_PROGRESS   // Chauffeur en route
+  ARRIVED       // Arrive sur place
+  COMPLETED     // Livre
+  FAILED        // Echec de livraison
+  SKIPPED       // Saute
+}
+
+model RouteStop {
+  id              String      @id @default(cuid())
+  stopNumber      Int         // Ordre dans la route
+  status          StopStatus  @default(PENDING)
+
+  // Adresse
+  recipientName   String?
+  address         String
+  city            String
+  postalCode      String
+  phone           String?
+
+  // Coordonnees GPS
+  latitude        Float?
+  longitude       Float?
+
+  // Instructions
+  accessCode      String?     // Code d'acces immeuble
+  instructions    String?     // Instructions speciales
+
+  // Temps
+  estimatedArrival DateTime?
+  actualArrival   DateTime?
+  departureTime   DateTime?
+
+  // Preuve de livraison
+  signature       String?     // Base64 de la signature
+  signedBy        String?     // Nom du signataire
+  proofPhoto      String?     // URL ou Base64 de la photo
+  deliveryNotes   String?     // Notes a la livraison
+  failureReason   String?     // Raison si echec
+
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  // Relations
+  routeId         String
+  route           Route       @relation(fields: [routeId], references: [id], onDelete: Cascade)
+
+  packages        Package[]
+
+  // Index pour optimiser les requetes
+  @@index([routeId, stopNumber])
+}
+
+// ======================= COMMANDES & COLIS =======================
+
+enum OrderStatus {
+  PENDING       // En attente
+  CONFIRMED     // Confirmee
+  PICKED_UP     // Recuperee
+  IN_TRANSIT    // En transit
+  OUT_FOR_DELIVERY // En cours de livraison
+  DELIVERED     // Livree
+  CANCELLED     // Annulee
+  RETURNED      // Retournee
+}
+
+enum OrderPriority {
+  LOW
+  NORMAL
+  HIGH
+  URGENT
+}
+
+model Order {
+  id              String        @id @default(cuid())
+  trackingNumber  String        @unique @default(cuid())
+  status          OrderStatus   @default(PENDING)
+  priority        OrderPriority @default(NORMAL)
+
+  // Adresses
+  pickupAddress   String
+  pickupCity      String
+  pickupPostalCode String
+  deliveryAddress String
+  deliveryCity    String
+  deliveryPostalCode String
+
+  // Details
+  description     String?
+  weight          Float?        // en kg
+  dimensions      String?       // LxWxH en cm
+  specialInstructions String?
+
+  // Dates
+  pickupDate      DateTime?
+  estimatedDelivery DateTime?
+  actualDelivery  DateTime?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  // Prix
+  price           Float         @default(0)
+
+  // Relations
+  customerId      String
+  customer        Customer      @relation(fields: [customerId], references: [id])
+
+  createdById     String
+  createdBy       User          @relation("OrderCreator", fields: [createdById], references: [id])
+
+  driverId        String?
+  driver          Driver?       @relation(fields: [driverId], references: [id])
+
+  vehicleId       String?
+  vehicle         Vehicle?      @relation(fields: [vehicleId], references: [id])
+
+  warehouseId     String?
+  warehouse       Warehouse?    @relation(fields: [warehouseId], references: [id])
+
+  packages        Package[]
+  trackingEvents  TrackingEvent[]
+  invoiceItems    InvoiceItem[]
+}
+
+enum PackageStatus {
+  PENDING         // En attente
+  IN_TRANSIT      // En transit
+  OUT_FOR_DELIVERY // En livraison
+  DELIVERED       // Livre
+  FAILED          // Echec
+  RETURNED        // Retourne
+}
+
+model Package {
+  id              String        @id @default(cuid())
+
+  // Double reference code-barre
+  barcode         String        @unique @default(cuid())  // Notre code interne
+  externalBarcode String?       // Code-barre du client (Amazon, Purolator, etc.)
+
+  status          PackageStatus @default(PENDING)
+
+  // Details physiques
+  weight          Float?        // en kg
+  length          Float?        // en cm
+  width           Float?        // en cm
+  height          Float?        // en cm
+  description     String?
+
+  // Preuve de livraison (niveau colis)
+  signature       String?       // Base64 de la signature
+  signedBy        String?       // Nom du signataire
+  proofPhoto      String?       // URL ou Base64 de la photo
+  deliveredAt     DateTime?
+  deliveryNotes   String?
+
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  // Relations
+  orderId         String?
+  order           Order?        @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  routeStopId     String?
+  routeStop       RouteStop?    @relation(fields: [routeStopId], references: [id])
+
+  contractId      String?
+  contract        Contract?     @relation(fields: [contractId], references: [id])
+
+  // Index pour recherche par code-barre
+  @@index([externalBarcode])
+}
+
+// ======================= TRACKING =======================
+
+enum TrackingEventType {
+  ORDER_CREATED
+  ORDER_CONFIRMED
+  PICKED_UP
+  IN_WAREHOUSE
+  IN_TRANSIT
+  OUT_FOR_DELIVERY
+  DELIVERY_ATTEMPTED
+  DELIVERED
+  CANCELLED
+  RETURNED
+  EXCEPTION
+  SCAN           // Scan de code-barre
+  SIGNATURE      // Signature capturee
+  PHOTO          // Photo prise
+}
+
+model TrackingEvent {
+  id          String            @id @default(cuid())
+  type        TrackingEventType
+  description String
+  location    String?
+  latitude    Float?
+  longitude   Float?
+
+  // Preuve
+  signature   String?           // Base64 de la signature
+  photoUrl    String?           // URL de la photo
+  scannedBarcode String?        // Code-barre scanne
+
+  timestamp   DateTime          @default(now())
+
+  // Relations
+  orderId     String
+  order       Order             @relation(fields: [orderId], references: [id], onDelete: Cascade)
+}
+
+// ======================= FLOTTE =======================
+
+enum VehicleType {
+  VAN
+  TRUCK
+  MOTORCYCLE
+  BICYCLE
+  CAR
+}
+
+enum VehicleStatus {
+  AVAILABLE
+  IN_USE
+  MAINTENANCE
+  OUT_OF_SERVICE
+}
+
+model Vehicle {
+  id              String        @id @default(cuid())
+  plateNumber     String        @unique
+  type            VehicleType
+  brand           String
+  model           String
+  year            Int?
+  capacity        Float?        // en kg
+  volume          Float?        // en m3
+  status          VehicleStatus @default(AVAILABLE)
+  currentLocation String?
+  latitude        Float?
+  longitude       Float?
+  fuelType        String?
+  lastMaintenance DateTime?
+  nextMaintenance DateTime?
+  isActive        Boolean       @default(true)
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  // Relations
+  driverId        String?
+  driver          Driver?       @relation(fields: [driverId], references: [id])
+  orders          Order[]
+  routes          Route[]
+  maintenances    Maintenance[]
+}
+
+model Driver {
+  id              String    @id @default(cuid())
+  licenseNumber   String    @unique
+  licenseExpiry   DateTime
+  phone           String
+  emergencyContact String?
+  isAvailable     Boolean   @default(true)
+  currentLocation String?
+  latitude        Float?
+  longitude       Float?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  // Relations
+  userId          String    @unique
+  user            User      @relation(fields: [userId], references: [id])
+  vehicles        Vehicle[]
+  orders          Order[]
+  routes          Route[]
+}
+
+model Maintenance {
+  id            String    @id @default(cuid())
+  type          String    // Oil change, Tire change, etc.
+  description   String?
+  cost          Float?
+  scheduledDate DateTime
+  completedDate DateTime?
+  notes         String?
+  createdAt     DateTime  @default(now())
+
+  // Relations
+  vehicleId     String
+  vehicle       Vehicle   @relation(fields: [vehicleId], references: [id])
+}
+
+// ======================= ENTREPOTS =======================
+
+model Warehouse {
+  id            String    @id @default(cuid())
+  name          String
+  address       String
+  city          String
+  postalCode    String
+  country       String    @default("France")
+  capacity      Float?    // en m3
+  currentStock  Float     @default(0)
+  latitude      Float?
+  longitude     Float?
+  phone         String?
+  email         String?
+  isActive      Boolean   @default(true)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // Relations
+  orders        Order[]
+  inventory     InventoryItem[]
+}
+
+model InventoryItem {
+  id            String    @id @default(cuid())
+  sku           String
+  name          String
+  description   String?
+  quantity      Int       @default(0)
+  minQuantity   Int       @default(0)
+  location      String?   // Zone dans l'entrepot
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // Relations
+  warehouseId   String
+  warehouse     Warehouse @relation(fields: [warehouseId], references: [id])
+
+  @@unique([sku, warehouseId])
+}
+
+// ======================= FACTURATION =======================
+
+enum InvoiceStatus {
+  DRAFT
+  SENT
+  PAID
+  OVERDUE
+  CANCELLED
+}
+
+model Invoice {
+  id            String        @id @default(cuid())
+  invoiceNumber String        @unique
+  status        InvoiceStatus @default(DRAFT)
+  issueDate     DateTime      @default(now())
+  dueDate       DateTime
+  subtotal      Float
+  taxRate       Float         @default(20)
+  taxAmount     Float
+  total         Float
+  notes         String?
+  paidAt        DateTime?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  // Relations
+  customerId    String
+  customer      Customer      @relation(fields: [customerId], references: [id])
+
+  createdById   String
+  createdBy     User          @relation(fields: [createdById], references: [id])
+
+  items         InvoiceItem[]
+}
+
+model InvoiceItem {
+  id          String  @id @default(cuid())
+  description String
+  quantity    Int     @default(1)
+  unitPrice   Float
+  total       Float
+
+  // Relations
+  invoiceId   String
+  invoice     Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  orderId     String?
+  order       Order?  @relation(fields: [orderId], references: [id])
+}
+
+// ======================= PARAMETRES =======================
+
+model Settings {
+  id              String    @id @default(cuid())
+  companyName     String    @default("LogiFlow")
+  companyAddress  String?
+  companyPhone    String?
+  companyEmail    String?
+  companyLogo     String?
+  currency        String    @default("EUR")
+  timezone        String    @default("Europe/Paris")
+  defaultTaxRate  Float     @default(20)
+  trackingPageUrl String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+}

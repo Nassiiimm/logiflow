@@ -1,0 +1,16 @@
+adresse,ville,code postal,destinataire,telephone,tracking,instructions,digicode
+123 Rue Sainte-Catherine,Montreal,H2X1L4,Jean Dupont,514-555-0101,AMZ-001-2024,Laisser chez le voisin si absent,1234
+456 Boulevard Saint-Laurent,Montreal,H2X2V2,Marie Martin,514-555-0102,AMZ-002-2024,Appeler avant livraison,
+789 Avenue du Parc,Montreal,H2V4E7,Pierre Tremblay,514-555-0103,AMZ-003-2024,,5678
+321 Rue Sherbrooke Est,Montreal,H2L1K6,Sophie Gagnon,514-555-0104,AMZ-004-2024,Fragile - Ne pas plier,
+654 Rue Ontario Est,Montreal,H2L1N8,Luc Bergeron,514-555-0105,AMZ-005-2024,,
+987 Avenue Papineau,Montreal,H2K4J5,Anne Lavoie,514-555-0106,AMZ-006-2024,Livrer apres 17h,9999
+147 Rue Rachel Est,Montreal,H2W1E5,Marc Bouchard,514-555-0107,AMZ-007-2024,,
+258 Boulevard Rosemont,Montreal,H1X1K8,Julie Roy,514-555-0108,AMZ-008-2024,Sonner 2 fois,
+369 Avenue Christophe-Colomb,Montreal,H2S2G5,Paul Morin,514-555-0109,AMZ-009-2024,,4321
+741 Rue Masson,Montreal,H2R1Y8,Claire Fortin,514-555-0110,AMZ-010-2024,,
+852 Rue Beaubien Est,Montreal,H2S1P9,David Cote,514-555-0111,AMZ-011-2024,Attention chien,
+963 Avenue de Lorimier,Montreal,H2K3W6,Emma Pelletier,514-555-0112,AMZ-012-2024,,8765
+123 Rue Sainte-Catherine,Montreal,H2X1L4,Thomas Richard,514-555-0113,AMZ-013-2024,Meme adresse que Jean Dupont,1234
+159 Rue Jean-Talon Est,Montreal,H2R1S8,Sarah Leblanc,514-555-0114,AMZ-014-2024,,
+267 Avenue du Mont-Royal Est,Montreal,H2J1W8,Nicolas Gauthier,514-555-0115,AMZ-015-2024,Bureau 302,5555

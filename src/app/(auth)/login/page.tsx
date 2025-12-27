@@ -45,19 +45,30 @@ export default function LoginPage() {
         redirect: "manual",
       });
 
-      console.log("Auth response:", res.status, res.headers.get("location"));
+      console.log("Auth response status:", res.status);
+      console.log("Auth response type:", res.type);
+      console.log("Auth response redirected:", res.redirected);
+      console.log("Auth response url:", res.url);
 
-      if (res.status === 302 || res.status === 200) {
-        const location = res.headers.get("location");
-        if (location?.includes("error")) {
+      // With redirect: "manual", a 302 becomes status 0 with type "opaqueredirect"
+      if (res.type === "opaqueredirect" || res.status === 0 || res.redirected) {
+        // Success - redirected means auth worked
+        toast.success("Connexion reussie !");
+        window.location.href = "/dashboard";
+      } else if (res.status === 200) {
+        // Check if it's an error page
+        const text = await res.text();
+        console.log("Response body:", text.substring(0, 200));
+        if (text.includes("error") || text.includes("Error")) {
           toast.error("Email ou mot de passe incorrect");
-          setIsLoading(false);
         } else {
           toast.success("Connexion reussie !");
           window.location.href = "/dashboard";
         }
+        setIsLoading(false);
       } else {
-        toast.error("Erreur de connexion");
+        console.log("Unexpected status:", res.status);
+        toast.error(`Erreur: ${res.status}`);
         setIsLoading(false);
       }
     } catch (err) {

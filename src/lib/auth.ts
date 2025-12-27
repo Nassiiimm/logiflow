@@ -15,38 +15,46 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         password: { label: "Mot de passe", type: "password" },
       },
       async authorize(credentials) {
-        console.log("[auth] authorize called with email:", credentials?.email);
+        console.log("[auth] ========= AUTHORIZE START =========");
+        console.log("[auth] credentials received:", JSON.stringify(credentials));
+        console.log("[auth] email:", credentials?.email);
+        console.log("[auth] password length:", credentials?.password ? String(credentials.password).length : 0);
 
         if (!credentials?.email || !credentials?.password) {
-          console.log("[auth] Missing credentials");
+          console.log("[auth] FAIL: Missing credentials");
           return null;
         }
 
+        const email = String(credentials.email).trim();
+        const password = String(credentials.password);
+
+        console.log("[auth] Trimmed email:", email);
+
         try {
           const user = await prisma.user.findUnique({
-            where: { email: credentials.email as string },
+            where: { email },
           });
 
-          console.log("[auth] User found:", user ? "yes" : "no", user?.email);
+          console.log("[auth] DB query done, user found:", !!user);
 
           if (!user || !user.password) {
-            console.log("[auth] User not found or no password");
+            console.log("[auth] FAIL: User not found or no password");
             return null;
           }
 
-          const isPasswordValid = await bcrypt.compare(
-            credentials.password as string,
-            user.password
-          );
+          console.log("[auth] User email:", user.email);
+          console.log("[auth] Comparing passwords...");
 
-          console.log("[auth] Password valid:", isPasswordValid);
+          const isPasswordValid = await bcrypt.compare(password, user.password);
+
+          console.log("[auth] Password comparison result:", isPasswordValid);
 
           if (!isPasswordValid) {
-            console.log("[auth] Invalid password");
+            console.log("[auth] FAIL: Invalid password");
             return null;
           }
 
-          console.log("[auth] Login successful for:", user.email);
+          console.log("[auth] SUCCESS: Login for", user.email);
           return {
             id: user.id,
             email: user.email,
@@ -54,7 +62,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
             role: user.role,
           };
         } catch (error) {
-          console.error("[auth] Error in authorize:", error);
+          console.error("[auth] ERROR:", error);
           return null;
         }
       },
@@ -82,18 +90,5 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
   session: {
     strategy: "jwt",
     maxAge: 30 * 24 * 60 * 60, // 30 days
-  },
-  cookies: {
-    sessionToken: {
-      name: process.env.NODE_ENV === "production"
-        ? "__Secure-authjs.session-token"
-        : "authjs.session-token",
-      options: {
-        httpOnly: true,
-        sameSite: "lax",
-        path: "/",
-        secure: process.env.NODE_ENV === "production",
-      },
-    },
   },
 });

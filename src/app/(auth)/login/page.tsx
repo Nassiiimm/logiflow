@@ -14,16 +14,11 @@ export default function LoginPage() {
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    console.log("=== LOGIN SUBMIT START ===");
-    alert("Login clicked!"); // Force visible feedback
     setIsLoading(true);
 
     const formData = new FormData(e.currentTarget);
     const email = formData.get("email") as string;
     const password = formData.get("password") as string;
-
-    console.log("Email:", email);
-    console.log("Password length:", password?.length);
 
     if (!email || !password) {
       toast.error("Veuillez remplir tous les champs");
@@ -32,12 +27,11 @@ export default function LoginPage() {
     }
 
     try {
-      console.log("Fetching CSRF token...");
-      // Get CSRF token first
-      const csrfRes = await fetch("/api/auth/csrf");
-      console.log("CSRF response status:", csrfRes.status);
+      // Get CSRF token first (with credentials to get cookies)
+      const csrfRes = await fetch("/api/auth/csrf", {
+        credentials: "include",
+      });
       const csrfData = await csrfRes.json();
-      console.log("CSRF data:", csrfData);
       const csrfToken = csrfData.csrfToken;
 
       // Submit to NextAuth callback
@@ -51,35 +45,27 @@ export default function LoginPage() {
           email,
           password,
         }),
+        credentials: "include",
         redirect: "manual",
       });
 
-      console.log("Auth response status:", res.status);
-      console.log("Auth response type:", res.type);
-      console.log("Auth response redirected:", res.redirected);
-      console.log("Auth response url:", res.url);
-
-      // With redirect: "manual", a 302 becomes status 0 with type "opaqueredirect"
-      if (res.type === "opaqueredirect" || res.status === 0 || res.redirected) {
-        // Success - redirected means auth worked
+      // With redirect: "manual", success returns opaqueredirect
+      if (res.type === "opaqueredirect") {
         toast.success("Connexion reussie !");
         window.location.href = "/dashboard";
-      } else if (res.status === 200) {
-        // Check if it's an error page
-        const text = await res.text();
-        console.log("Response body:", text.substring(0, 200));
-        if (text.includes("error") || text.includes("Error")) {
-          toast.error("Email ou mot de passe incorrect");
-        } else {
-          toast.success("Connexion reussie !");
-          window.location.href = "/dashboard";
-        }
-        setIsLoading(false);
-      } else {
-        console.log("Unexpected status:", res.status);
-        toast.error(`Erreur: ${res.status}`);
-        setIsLoading(false);
+        return;
       }
+
+      // Check URL for error
+      if (res.url?.includes("error")) {
+        toast.error("Email ou mot de passe incorrect");
+        setIsLoading(false);
+        return;
+      }
+
+      // Default: try to redirect
+      toast.success("Connexion reussie !");
+      window.location.href = "/dashboard";
     } catch (err) {
       console.error("Login error:", err);
       toast.error("Une erreur est survenue");

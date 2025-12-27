@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Truck, Loader2 } from "lucide-react";
@@ -10,7 +11,6 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { loginSchema } from "@/lib/validations";
 import { toast } from "sonner";
-import { loginAction } from "@/lib/actions/auth";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -38,16 +38,21 @@ export default function LoginPage() {
     setIsLoading(true);
 
     try {
-      const result = await loginAction(email, password);
+      const result = await signIn("credentials", {
+        email,
+        password,
+        redirect: false,
+      });
 
-      // If we get here without a redirect, it means login failed
-      if (result && !result.success) {
-        toast.error(result.error || "Email ou mot de passe incorrect");
-        setIsLoading(false);
+      if (result?.error) {
+        toast.error("Email ou mot de passe incorrect");
+      } else if (result?.ok) {
+        toast.success("Connexion reussie");
+        window.location.href = "/dashboard";
       }
-      // On success, the server action redirects automatically
     } catch {
-      // Redirect errors are normal on success
+      toast.error("Une erreur est survenue");
+    } finally {
       setIsLoading(false);
     }
   };
@@ -115,7 +120,7 @@ export default function LoginPage() {
         </div>
         <div className="mt-6 p-4 bg-zinc-900/50 border border-zinc-800 rounded-lg">
           <p className="text-xs text-zinc-500 text-center">
-            Demo: admin@logiflow.com / password123
+            Demo: admin@logiflow.fr / Admin123!
           </p>
         </div>
       </CardContent>

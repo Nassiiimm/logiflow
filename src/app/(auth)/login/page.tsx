@@ -1,67 +1,67 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { signIn, getCsrfToken } from "next-auth/react";
+import { useState } from "react";
 import Link from "next/link";
 import { Truck, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { loginSchema } from "@/lib/validations";
 import { toast } from "sonner";
 
 export default function LoginPage() {
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
   const [isLoading, setIsLoading] = useState(false);
-  const [csrfToken, setCsrfToken] = useState<string>("");
 
-  useEffect(() => {
-    getCsrfToken().then((token) => {
-      if (token) setCsrfToken(token);
-    });
-  }, []);
-
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    setErrors({});
+    setIsLoading(true);
 
-    // Validate with Zod
-    const result = loginSchema.safeParse({ email, password });
-    if (!result.success) {
-      const fieldErrors: { email?: string; password?: string } = {};
-      result.error.issues.forEach((err) => {
-        if (err.path[0] === "email") fieldErrors.email = err.message;
-        if (err.path[0] === "password") fieldErrors.password = err.message;
-      });
-      setErrors(fieldErrors);
+    const formData = new FormData(e.currentTarget);
+    const email = formData.get("email") as string;
+    const password = formData.get("password") as string;
+
+    if (!email || !password) {
+      toast.error("Veuillez remplir tous les champs");
+      setIsLoading(false);
       return;
     }
 
-    setIsLoading(true);
-
     try {
-      const result = await signIn("credentials", {
-        email,
-        password,
-        redirect: false,
+      // Get CSRF token first
+      const csrfRes = await fetch("/api/auth/csrf");
+      const { csrfToken } = await csrfRes.json();
+
+      // Submit to NextAuth callback
+      const res = await fetch("/api/auth/callback/credentials", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+        },
+        body: new URLSearchParams({
+          csrfToken,
+          email,
+          password,
+        }),
+        redirect: "manual",
       });
 
-      console.log("SignIn result:", JSON.stringify(result));
+      console.log("Auth response:", res.status, res.headers.get("location"));
 
-      if (result?.error) {
-        toast.error("Email ou mot de passe incorrect");
-        setIsLoading(false);
-      } else {
-        toast.success("Connexion reussie !");
-        setTimeout(() => {
+      if (res.status === 302 || res.status === 200) {
+        const location = res.headers.get("location");
+        if (location?.includes("error")) {
+          toast.error("Email ou mot de passe incorrect");
+          setIsLoading(false);
+        } else {
+          toast.success("Connexion reussie !");
           window.location.href = "/dashboard";
-        }, 500);
+        }
+      } else {
+        toast.error("Erreur de connexion");
+        setIsLoading(false);
       }
     } catch (err) {
-      console.error("SignIn error:", err);
+      console.error("Login error:", err);
       toast.error("Une erreur est survenue");
       setIsLoading(false);
     }
@@ -83,7 +83,6 @@ export default function LoginPage() {
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-4">
-          <input type="hidden" name="csrfToken" value={csrfToken} />
           <div className="space-y-2">
             <Label htmlFor="email">Email</Label>
             <Input
@@ -91,13 +90,8 @@ export default function LoginPage() {
               name="email"
               type="email"
               placeholder="admin@logiflow.fr"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className={errors.email ? "border-red-500" : ""}
+              autoComplete="email"
             />
-            {errors.email && (
-              <p className="text-xs text-red-400">{errors.email}</p>
-            )}
           </div>
           <div className="space-y-2">
             <Label htmlFor="password">Mot de passe</Label>
@@ -106,13 +100,8 @@ export default function LoginPage() {
               name="password"
               type="password"
               placeholder="Votre mot de passe"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className={errors.password ? "border-red-500" : ""}
+              autoComplete="current-password"
             />
-            {errors.password && (
-              <p className="text-xs text-red-400">{errors.password}</p>
-            )}
           </div>
           <Button type="submit" className="w-full bg-cyan-600 hover:bg-cyan-700" disabled={isLoading}>
             {isLoading ? (

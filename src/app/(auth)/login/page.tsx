@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Truck, Loader2 } from "lucide-react";
@@ -11,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { loginSchema } from "@/lib/validations";
 import { toast } from "sonner";
+import { loginAction } from "@/lib/actions/auth";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -38,18 +38,14 @@ export default function LoginPage() {
     setIsLoading(true);
 
     try {
-      const signInResult = await signIn("credentials", {
-        email,
-        password,
-        redirect: false,
-      });
+      const result = await loginAction(email, password);
 
-      if (signInResult?.error) {
-        toast.error("Email ou mot de passe incorrect");
-      } else {
+      if (result.success) {
         toast.success("Connexion reussie");
         router.push("/dashboard");
         router.refresh();
+      } else {
+        toast.error(result.error || "Email ou mot de passe incorrect");
       }
     } catch {
       toast.error("Une erreur est survenue");

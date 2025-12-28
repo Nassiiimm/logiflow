@@ -15,47 +15,25 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         password: { label: "Mot de passe", type: "password" },
       },
       async authorize(credentials) {
-        console.log("=== AUTHORIZE START ===");
-        console.log("credentials type:", typeof credentials);
-        console.log("credentials keys:", credentials ? Object.keys(credentials) : "null");
-
-        // Log each key
-        if (credentials) {
-          for (const [key, value] of Object.entries(credentials)) {
-            console.log(`credentials.${key}:`, String(value).substring(0, 50));
-          }
-        }
-
         if (!credentials?.email || !credentials?.password) {
-          console.log("Missing email or password");
           return null;
         }
 
         const email = String(credentials.email).trim();
         const password = String(credentials.password);
 
-        console.log("Email:", email);
-        console.log("Password:", password);
-        console.log("Password length:", password.length);
-
         try {
           const user = await prisma.user.findUnique({
             where: { email },
           });
 
-          console.log("User found:", !!user);
-
           if (!user || !user.password) {
-            console.log("No user or no password");
             return null;
           }
 
-          console.log("Stored hash:", user.password.substring(0, 20) + "...");
           const isPasswordValid = await bcrypt.compare(password, user.password);
-          console.log("Password valid:", isPasswordValid);
 
           if (!isPasswordValid) {
-            console.log("Password mismatch!");
             return null;
           }
 

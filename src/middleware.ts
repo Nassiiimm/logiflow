@@ -54,8 +54,6 @@ export async function middleware(request: NextRequest) {
       cookieName: "__Secure-authjs.session-token",
     });
 
-    console.log("[middleware] token:", token ? "found" : "not found");
-
     if (!token) {
       return NextResponse.redirect(new URL("/login", request.url));
     }

@@ -11,11 +11,8 @@ export default function LoginPage() {
   useEffect(() => {
     fetch("/api/auth/csrf", { credentials: "include" })
       .then((res) => res.json())
-      .then((data) => {
-        console.log("CSRF token loaded:", data.csrfToken?.substring(0, 20));
-        setCsrfToken(data.csrfToken);
-      })
-      .catch((err) => console.error("CSRF fetch error:", err));
+      .then((data) => setCsrfToken(data.csrfToken))
+      .catch(() => {});
   }, []);
 
   return (

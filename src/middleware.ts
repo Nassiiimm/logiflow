@@ -51,7 +51,10 @@ export async function middleware(request: NextRequest) {
     const token = await getToken({
       req: request,
       secret: process.env.AUTH_SECRET,
+      cookieName: "__Secure-authjs.session-token",
     });
+
+    console.log("[middleware] token:", token ? "found" : "not found");
 
     if (!token) {
       return NextResponse.redirect(new URL("/login", request.url));

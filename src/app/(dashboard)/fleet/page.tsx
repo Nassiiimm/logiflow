@@ -40,7 +40,9 @@ import {
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Label } from "@/components/ui/label";
-import { Plus, Search, Edit, Trash2, Truck, User, Wrench, Loader2 } from "lucide-react";
+import { Plus, Search, Edit, Trash2, Truck, User, Wrench, Loader2, Eye, ToggleLeft, ToggleRight } from "lucide-react";
+import Link from "next/link";
+import { Switch } from "@/components/ui/switch";
 import { getStatusColor, getStatusLabel, formatDate } from "@/lib/utils";
 import { toast } from "sonner";
 
@@ -92,6 +94,12 @@ export default function FleetPage() {
     name: "",
   });
 
+  // Edit dialogs
+  const [isEditVehicleDialogOpen, setIsEditVehicleDialogOpen] = useState(false);
+  const [isEditDriverDialogOpen, setIsEditDriverDialogOpen] = useState(false);
+  const [editingVehicle, setEditingVehicle] = useState<Vehicle | null>(null);
+  const [editingDriver, setEditingDriver] = useState<Driver | null>(null);
+
   const [vehicleForm, setVehicleForm] = useState({
     plateNumber: "",
     type: "",
@@ -107,6 +115,24 @@ export default function FleetPage() {
     phone: "",
     licenseNumber: "",
     licenseExpiry: "",
+  });
+
+  const [editVehicleForm, setEditVehicleForm] = useState({
+    plateNumber: "",
+    type: "",
+    brand: "",
+    model: "",
+    year: "",
+    capacity: "",
+    status: "",
+  });
+
+  const [editDriverForm, setEditDriverForm] = useState({
+    name: "",
+    phone: "",
+    licenseNumber: "",
+    licenseExpiry: "",
+    isAvailable: true,
   });
 
   useEffect(() => {
@@ -222,6 +248,107 @@ export default function FleetPage() {
       toast.error("Erreur lors de la suppression");
     } finally {
       setDeleteDialog({ open: false, type: "vehicle", id: "", name: "" });
+    }
+  }
+
+  function openEditVehicle(vehicle: Vehicle) {
+    setEditingVehicle(vehicle);
+    setEditVehicleForm({
+      plateNumber: vehicle.plateNumber,
+      type: vehicle.type,
+      brand: vehicle.brand || "",
+      model: vehicle.model || "",
+      year: vehicle.year?.toString() || "",
+      capacity: vehicle.capacity?.toString() || "",
+      status: vehicle.status,
+    });
+    setIsEditVehicleDialogOpen(true);
+  }
+
+  function openEditDriver(driver: Driver) {
+    setEditingDriver(driver);
+    setEditDriverForm({
+      name: driver.name,
+      phone: driver.phone || "",
+      licenseNumber: driver.licenseNumber,
+      licenseExpiry: driver.licenseExpiry.split("T")[0],
+      isAvailable: driver.isAvailable,
+    });
+    setIsEditDriverDialogOpen(true);
+  }
+
+  async function handleEditVehicleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!editingVehicle) return;
+    setIsSubmitting(true);
+
+    try {
+      const res = await fetch(`/api/vehicles/${editingVehicle.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(editVehicleForm),
+      });
+
+      if (res.ok) {
+        toast.success("Vehicule mis a jour");
+        setIsEditVehicleDialogOpen(false);
+        setEditingVehicle(null);
+        fetchData();
+      } else {
+        const data = await res.json();
+        toast.error(data.error || "Erreur lors de la mise a jour");
+      }
+    } catch (error) {
+      toast.error("Erreur lors de la mise a jour");
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  async function handleEditDriverSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!editingDriver) return;
+    setIsSubmitting(true);
+
+    try {
+      const res = await fetch(`/api/drivers/${editingDriver.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(editDriverForm),
+      });
+
+      if (res.ok) {
+        toast.success("Chauffeur mis a jour");
+        setIsEditDriverDialogOpen(false);
+        setEditingDriver(null);
+        fetchData();
+      } else {
+        const data = await res.json();
+        toast.error(data.error || "Erreur lors de la mise a jour");
+      }
+    } catch (error) {
+      toast.error("Erreur lors de la mise a jour");
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  async function toggleDriverAvailability(driver: Driver) {
+    try {
+      const res = await fetch(`/api/drivers/${driver.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ isAvailable: !driver.isAvailable }),
+      });
+
+      if (res.ok) {
+        toast.success(driver.isAvailable ? "Chauffeur marque indisponible" : "Chauffeur marque disponible");
+        fetchData();
+      } else {
+        toast.error("Erreur lors de la mise a jour");
+      }
+    } catch (error) {
+      toast.error("Erreur lors de la mise a jour");
     }
   }
 
@@ -452,7 +579,12 @@ export default function FleetPage() {
                         </TableCell>
                         <TableCell className="text-right">
                           <div className="flex justify-end gap-2">
-                            <Button variant="ghost" size="icon" className="text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/50">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/50"
+                              onClick={() => openEditVehicle(vehicle)}
+                            >
                               <Edit className="h-4 w-4" />
                             </Button>
                             <Button
@@ -610,19 +742,30 @@ export default function FleetPage() {
                         <TableCell className="text-zinc-300">{driver.vehicle || "-"}</TableCell>
                         <TableCell className="text-zinc-300">{driver.deliveriesCount}</TableCell>
                         <TableCell>
-                          <Badge
-                            className={
-                              driver.isAvailable
-                                ? "bg-emerald-500/15 text-emerald-400 border border-emerald-500/20"
-                                : "bg-cyan-500/15 text-cyan-400 border border-cyan-500/20"
-                            }
-                          >
-                            {driver.isAvailable ? "Disponible" : "En course"}
-                          </Badge>
+                          <div className="flex items-center gap-2">
+                            <Switch
+                              checked={driver.isAvailable}
+                              onCheckedChange={() => toggleDriverAvailability(driver)}
+                              className="data-[state=checked]:bg-emerald-500"
+                            />
+                            <span className={driver.isAvailable ? "text-emerald-400 text-sm" : "text-zinc-500 text-sm"}>
+                              {driver.isAvailable ? "Disponible" : "Indisponible"}
+                            </span>
+                          </div>
                         </TableCell>
                         <TableCell className="text-right">
                           <div className="flex justify-end gap-2">
-                            <Button variant="ghost" size="icon" className="text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/50">
+                            <Link href={`/fleet/drivers/${driver.id}`}>
+                              <Button variant="ghost" size="icon" className="text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/50">
+                                <Eye className="h-4 w-4" />
+                              </Button>
+                            </Link>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/50"
+                              onClick={() => openEditDriver(driver)}
+                            >
                               <Edit className="h-4 w-4" />
                             </Button>
                             <Button
@@ -675,6 +818,182 @@ export default function FleetPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Edit Vehicle Dialog */}
+      <Dialog open={isEditVehicleDialogOpen} onOpenChange={setIsEditVehicleDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Modifier le vehicule</DialogTitle>
+            <DialogDescription>
+              Modifiez les informations du vehicule {editingVehicle?.plateNumber}
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleEditVehicleSubmit} className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Immatriculation</Label>
+                <Input
+                  placeholder="AB-123-CD"
+                  value={editVehicleForm.plateNumber}
+                  onChange={(e) =>
+                    setEditVehicleForm({ ...editVehicleForm, plateNumber: e.target.value.toUpperCase() })
+                  }
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Type</Label>
+                <Select
+                  value={editVehicleForm.type}
+                  onValueChange={(v) => setEditVehicleForm({ ...editVehicleForm, type: v })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Type de vehicule" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="VAN">Fourgon</SelectItem>
+                    <SelectItem value="TRUCK">Camion</SelectItem>
+                    <SelectItem value="MOTORCYCLE">Moto</SelectItem>
+                    <SelectItem value="CAR">Voiture</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Marque</Label>
+                <Input
+                  placeholder="Renault"
+                  value={editVehicleForm.brand}
+                  onChange={(e) => setEditVehicleForm({ ...editVehicleForm, brand: e.target.value })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Modele</Label>
+                <Input
+                  placeholder="Master"
+                  value={editVehicleForm.model}
+                  onChange={(e) => setEditVehicleForm({ ...editVehicleForm, model: e.target.value })}
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Annee</Label>
+                <Input
+                  type="number"
+                  placeholder="2023"
+                  value={editVehicleForm.year}
+                  onChange={(e) => setEditVehicleForm({ ...editVehicleForm, year: e.target.value })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Capacite (kg)</Label>
+                <Input
+                  type="number"
+                  placeholder="1500"
+                  value={editVehicleForm.capacity}
+                  onChange={(e) => setEditVehicleForm({ ...editVehicleForm, capacity: e.target.value })}
+                />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label>Statut</Label>
+              <Select
+                value={editVehicleForm.status}
+                onValueChange={(v) => setEditVehicleForm({ ...editVehicleForm, status: v })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Statut du vehicule" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="AVAILABLE">Disponible</SelectItem>
+                  <SelectItem value="IN_USE">En utilisation</SelectItem>
+                  <SelectItem value="MAINTENANCE">En maintenance</SelectItem>
+                  <SelectItem value="OUT_OF_SERVICE">Hors service</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex justify-end gap-4">
+              <Button type="button" variant="outline" onClick={() => setIsEditVehicleDialogOpen(false)}>
+                Annuler
+              </Button>
+              <Button type="submit" disabled={isSubmitting}>
+                {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Enregistrer
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Driver Dialog */}
+      <Dialog open={isEditDriverDialogOpen} onOpenChange={setIsEditDriverDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Modifier le chauffeur</DialogTitle>
+            <DialogDescription>
+              Modifiez les informations de {editingDriver?.name}
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleEditDriverSubmit} className="space-y-4">
+            <div className="space-y-2">
+              <Label>Nom complet</Label>
+              <Input
+                placeholder="Jean Dupont"
+                value={editDriverForm.name}
+                onChange={(e) => setEditDriverForm({ ...editDriverForm, name: e.target.value })}
+                required
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Telephone</Label>
+                <Input
+                  placeholder="06 12 34 56 78"
+                  value={editDriverForm.phone}
+                  onChange={(e) => setEditDriverForm({ ...editDriverForm, phone: e.target.value })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>N Permis</Label>
+                <Input
+                  placeholder="123456789012"
+                  value={editDriverForm.licenseNumber}
+                  onChange={(e) => setEditDriverForm({ ...editDriverForm, licenseNumber: e.target.value })}
+                  required
+                />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label>Expiration du permis</Label>
+              <Input
+                type="date"
+                value={editDriverForm.licenseExpiry}
+                onChange={(e) => setEditDriverForm({ ...editDriverForm, licenseExpiry: e.target.value })}
+                required
+              />
+            </div>
+            <div className="flex items-center gap-3">
+              <Switch
+                id="availability"
+                checked={editDriverForm.isAvailable}
+                onCheckedChange={(checked) => setEditDriverForm({ ...editDriverForm, isAvailable: checked })}
+              />
+              <Label htmlFor="availability">Disponible pour les livraisons</Label>
+            </div>
+            <div className="flex justify-end gap-4">
+              <Button type="button" variant="outline" onClick={() => setIsEditDriverDialogOpen(false)}>
+                Annuler
+              </Button>
+              <Button type="submit" disabled={isSubmitting}>
+                {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Enregistrer
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
